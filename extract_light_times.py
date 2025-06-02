@@ -90,13 +90,13 @@ def measure_luminosity(video_path, x, y, width, height):
     cap.release()
     return avg_luminosity_values
 
-def analyze_signal(signal, threshold=0.6, smooth=False, window_size=3, plot=False):
+def analyze_signal(signal, threshold=3, smooth=True, window_size=3, plot=False, xlim=None):
     """
     Analyzes digital signal to extract ON and OFF transition times.
 
     Parameters:
     signal (list): A list of values representing the digital signal.
-    threshold (float): The threshold to reduce noise sensitivity. (range 0-1)
+    threshold (float): Threshold in standard deviations above median
     smooth (bool): Whether to smooth the signal using a moving average.
     window_size (int): The window size for the moving average (number of frames).
     plot (bool): Whether to plot graphs 
@@ -112,10 +112,11 @@ def analyze_signal(signal, threshold=0.6, smooth=False, window_size=3, plot=Fals
         signal = np.convolve(signal, np.ones(window_size)/window_size, mode='valid')
     
     # Rescale the signal to have min value 0 and max value 1
-    signal = (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
+    # signal = (signal - np.min(signal)) / (np.max(signal) - np.min(signal))
 
     # Detect transitions
-    above_thresh = signal > threshold
+    raw_thresh = np.median(signal) + np.std(signal)*threshold
+    above_thresh = signal > raw_thresh
     cross_thresh = np.diff(above_thresh)
 
     # frame index after rising above threshold
@@ -124,7 +125,7 @@ def analyze_signal(signal, threshold=0.6, smooth=False, window_size=3, plot=Fals
     falling = np.flatnonzero(cross_thresh & ~above_thresh[1:]) + 1 
 
     if plot:
-        plot_signal(signal, rising, falling)
+        plot_signal(signal, rising, falling, raw_thresh, xlim=xlim)
 
     if len(rising) != len(falling):
         raise ValueError("differing number of ON and OFF")
@@ -137,7 +138,7 @@ def analyze_signal(signal, threshold=0.6, smooth=False, window_size=3, plot=Fals
     frame_number = rising.tolist() + falling.tolist()
     return (frame_number, state)
 
-def plot_signal(signal, rising, falling, xlim=None):
+def plot_signal(signal, rising, falling, raw_thresh, xlim=None):
     import matplotlib.pyplot as plt
     plt.figure(figsize=(10, 6))
     x = list(range(len(signal)))
@@ -146,10 +147,13 @@ def plot_signal(signal, rising, falling, xlim=None):
     plt.ylabel('Luminosity')
 
     # Mark transitions
-    y = 1.1 * np.ones(np.shape(rising))
+    y = np.ones(np.shape(rising)) * np.max(signal)
     plt.scatter(rising, y, color='green')
-    y = -.1 * np.ones(np.shape(falling))
+    y = np.ones(np.shape(falling)) * np.min(signal)
     plt.scatter(falling, y, color='red')
+
+    # Mark threshold
+    plt.hlines(raw_thresh, 0, len(signal), color='orange')
 
     if xlim:
         plt.xlim(xlim)
