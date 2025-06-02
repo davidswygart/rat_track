@@ -64,6 +64,7 @@ def measure_luminosity(video_path, x, y, width, height):
     """
     cap = cv2.VideoCapture(video_path)
     avg_luminosity_values = []
+    # avg_background = []
     if not cap.isOpened():
         print("Error: Could not open video file.")
         return avg_luminosity_values
@@ -86,8 +87,16 @@ def measure_luminosity(video_path, x, y, width, height):
         # Extract the pixel region using NumPy slicing
         region = gray_frame[y_min:y_max, x_min:x_max]
         # Compute the average luminosity in the defined area
-        avg_luminosity_values.append(np.mean(region))
+        avg_region = np.mean(region)
+        # avg_frame = np.mean(gray_frame)
+        avg_luminosity_values.append(avg_region)
+        # avg_background.append(avg_frame)
+
+        # import matplotlib.pyplot as plt
+        # plt.imshow(region)
+        # plt.show()
     cap.release()
+    # return (avg_luminosity_values, avg_background)
     return avg_luminosity_values
 
 def analyze_signal(signal, threshold=3, smooth=True, window_size=3, plot=False, xlim=None):
