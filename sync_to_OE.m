@@ -1,6 +1,6 @@
 oe_events_path = "/home/lapishla/Desktop/small_test/export/openEphysData11_22_PV1__4634416_1/events.mat";
 video_events_path = "/home/lapishla/Desktop/small_test/videos/8_events.csv";
-% tracking_csv = "/home/lapishla/Desktop/small_test/videos/8DLC_Resnet50_pv2capMay28shuffle1_snapshot_160.csv";
+tracking_csv = "/home/lapishla/Desktop/small_test/videos/8DLC_Resnet50_pv2capMay28shuffle1_snapshot_160.csv";
 
 % oe_events_path = "/home/lapishla/Desktop/small_test/export/openEphysData12_05_PV30__4633954_28/events.mat";
 % video_events_path = "/home/lapishla/Desktop/small_test/videos/45_events.csv";
@@ -30,7 +30,7 @@ sum(e.state==0 & e.line==2) %216 , 216 == 432
 %%
 e = sortrows(e,"timestamp","ascend");
 v = sortrows(v,"frame","ascend");
-%%
+%% Find matching OE events and insert their timestamp
 v.oe_times(:) = nan;
 % Left ON
 v = add_oe_times(v, 1, 'L', e, 0, 2); %I checked and video L does correspond to line 2 for 2.mp4
@@ -40,9 +40,30 @@ v = add_oe_times(v, 0, 'L', e, 1, 2);
 v = add_oe_times(v, 1, 'R', e, 0, 1);
 % Right OFF
 v = add_oe_times(v, 0, 'R', e, 1, 1);
+ 
+if ~any(~isnan(v.oe_times)) % If all are nan
+    error('All are still nan. No matching events were found')
+end
 
+%% Interpolate the tracking times based on the OE event times
+v_tracking = load_tracking_csv(tracking_csv);
 
 %% functions
+function [v_tracking, model_name] = load_tracking_csv(filename)
+string_array = readcell(filename);
+
+model_name = string_array(1,2);
+
+bodypart = string(string_array(2, :));
+coords = string(string_array(3, :));
+headers = bodypart + "_" + coords;
+headers(1,1) = "frame";
+
+data = cell2mat(string_array(4:end,:));
+
+v_tracking = array2table(data, 'VariableNames', headers);
+end
+
 function v = add_oe_times(v, state_v, side_v, e, state_e, line_e)
 bool_v = v.state==state_v  &  strcmp(v.side, side_v);
 bool_e = e.state==state_e  &  e.line==line_e;
