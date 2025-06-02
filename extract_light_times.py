@@ -10,9 +10,9 @@ def main():
 
 def get_events(video_path):
     # constant values for left and right lights
-    y=150
-    height=60
-    width=20  
+    height=50
+    y=150 - int(height/2)
+    width=10  
 
     # analyze left light
     x=0
