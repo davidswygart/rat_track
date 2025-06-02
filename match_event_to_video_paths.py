@@ -34,7 +34,7 @@ def add_oe_event_path_to_csv(video_paths_csv):
             video_event_export.append("")
 
     video_df['oe_export_folder'] = video_event_export
-    video_df.to_csv(video_paths_csv)
+    video_df.to_csv(video_paths_csv, index=False)
 
 
 video_paths_csv = "/home/lapishla/Desktop/pv_videos/Anymaze_of_interest.csv"
