@@ -5,8 +5,22 @@ import pandas as pd
 import os
 
 def main():
-    video_path= "/home/lapishla/Desktop/small_test/videos/8.mp4"
-    get_events(video_path)
+    directory = "/home/lapishla/Desktop/small_test/videos/"
+    file_extension = '.mp4'
+    video_paths = get_paths_from_directory(directory, file_extension)
+    print(f'Analyzing {len(video_paths)} videos')
+    for path in video_paths:
+        events= get_events(path)
+        export_path= path.strip(file_extension) + '_events.csv'
+        events.to_csv(export_path)
+        print(f'exported {export_path}')
+
+def get_paths_from_directory(directory, file_extension=''):
+    file_paths = []
+    for filename in os.listdir(directory):
+        if filename.endswith(file_extension):
+            file_paths.append(os.path.join(directory, filename))
+    return file_paths
 
 def get_events(video_path):
     # constant values for left and right lights
