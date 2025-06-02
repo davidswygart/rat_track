@@ -46,9 +46,21 @@ if ~any(~isnan(v.oe_times)) % If all are nan
 end
 
 %% Interpolate the tracking times based on the OE event times
-v_tracking = load_tracking_csv(tracking_csv);
+[v_tracking, model_name] = load_tracking_csv(tracking_csv);
+v_tracking = interp_oe_times(v, v_tracking);
+save_file = erase(tracking_csv, '.csv') + "_synced.mat";
+
+save(save_file, 'v_tracking', 'model_name')
 
 %% functions
+function tracking = interp_oe_times(events, tracking)
+not_nan = ~isnan(events.oe_times);
+x = events.frame(not_nan);
+v = events.oe_times(not_nan);
+xq = tracking.frame;
+tracking.oe_times = interp1(x,v,xq, 'linear','extrap');
+end
+
 function [v_tracking, model_name] = load_tracking_csv(filename)
 string_array = readcell(filename);
 
