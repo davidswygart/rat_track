@@ -126,6 +126,12 @@ def analyze_signal(signal, threshold=0.6, smooth=False, window_size=3, plot=Fals
     if plot:
         plot_signal(signal, rising, falling)
 
+    if len(rising) != len(falling):
+        raise ValueError("differing number of ON and OFF")
+    
+    length_ON = falling - rising
+    if np.any(length_ON < 3):
+        print(f'WARNING: light ON time of {np.min(length_ON)} frames detected')
 
     state = [1] * len(rising) + [0] * len(falling)
     frame_number = rising.tolist() + falling.tolist()
