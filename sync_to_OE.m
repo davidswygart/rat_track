@@ -1,11 +1,5 @@
-oe_events_path = "/home/lapishla/Desktop/small_test/export/openEphysData11_22_PV1__4634416_1/events.mat";
-video_events_path = "/home/lapishla/Desktop/small_test/videos/8_events.csv";
-tracking_csv = "/home/lapishla/Desktop/small_test/videos/8DLC_Resnet50_pv2capMay28shuffle1_snapshot_160.csv";
 
-% oe_events_path = "/home/lapishla/Desktop/small_test/export/openEphysData12_05_PV30__4633954_28/events.mat";
-% video_events_path = "/home/lapishla/Desktop/small_test/videos/45_events.csv";
-% tracking_csv = "";
-
+function sync_single_experiment(oe_events_path, video_events_path, tracking_csv)
 e = load(oe_events_path);
 e = struct2table(e.data);
 v = readtable(video_events_path);
@@ -51,6 +45,7 @@ v_tracking = interp_oe_times(v, v_tracking);
 save_file = erase(tracking_csv, '.csv') + "_synced.mat";
 
 save(save_file, 'v_tracking', 'model_name')
+end
 
 %% functions
 function tracking = interp_oe_times(events, tracking)
