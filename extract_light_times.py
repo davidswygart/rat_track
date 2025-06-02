@@ -18,11 +18,13 @@ def get_events(video_path):
     x=0
     luminosity = measure_luminosity(video_path, x, y, width, height)
     (L_frame, L_state) = analyze_signal(luminosity)
+    print(f'{len(L_frame)} events found for left light')
 
     # analyze right light
     x=500
     luminosity = measure_luminosity(video_path, x, y, width*-1, height)
     (R_frame, R_state)  = analyze_signal(luminosity)
+    print(f'{len(R_frame)} events found for right light')
 
     # Combine into dataframe
     frame = L_frame + R_frame
