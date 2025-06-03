@@ -1,5 +1,52 @@
+video_csv = "/home/lapishla/Desktop/pv_videos/Anymaze_of_interest.csv";
+sync_all_from_csv(video_csv)
 
-function sync_single_experiment(oe_events_path, video_events_path, tracking_csv)
+
+function sync_all_from_csv(csv_path)
+
+video_table = readtable(csv_path);
+video_table = video_table(~video_table.skip, :);
+
+OE_export = "/home/lapishla/Desktop/pv_videos/katieExport/export/";
+video_events_parent = "/home/lapishla/Desktop/pv_videos/cropped_video/";
+video_table.tracking = cell(height(video_table),1);
+for ind = 1:height(video_table)
+    oe_events_path = OE_export + "/" + video_table.oe_export_folder(ind) + "/events.mat";
+    if ~isfile(oe_events_path)
+        warning("no OE event export found")
+        continue
+    end
+
+    id = video_table.ID(ind);
+    video_events_path = video_events_parent + "/" + num2str(id) + "_events.csv";
+    if ~isfile(video_events_path)
+        warning("no video event csv found")
+        continue
+    end
+
+    tracking_parent = "/home/lapishla/Desktop/pv2cap-2-2025-05-28/videos/";
+    model_post_string = "DLC_Resnet50_pv2capMay28shuffle1_snapshot_160.csv";
+    tracking_csv = tracking_parent + num2str(id) + model_post_string;
+    if ~isfile(tracking_csv)
+        warning("no DLC tracking csv found")
+        continue
+    end
+
+    try
+        t = sync_single_experiment(oe_events_path, video_events_path, tracking_csv);
+    catch
+        continue
+    end
+    video_table.tracking{ind} = t;
+
+end
+
+save(csv_path+".mat", "video_table")
+
+end
+
+
+function v_tracking = sync_single_experiment(oe_events_path, video_events_path, tracking_csv)
 e = load(oe_events_path);
 e = struct2table(e.data);
 v = readtable(video_events_path);
@@ -42,9 +89,9 @@ end
 %% Interpolate the tracking times based on the OE event times
 [v_tracking, model_name] = load_tracking_csv(tracking_csv);
 v_tracking = interp_oe_times(v, v_tracking);
-save_file = erase(tracking_csv, '.csv') + "_synced.mat";
+% save_file = erase(tracking_csv, '.csv') + "_synced.mat";
 
-save(save_file, 'v_tracking', 'model_name')
+% save(save_file, 'v_tracking', 'model_name')
 end
 
 %% functions

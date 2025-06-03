@@ -5,7 +5,7 @@ import pandas as pd
 import os
 
 def main():
-    directory = "/home/lapishla/Desktop/small_test/videos/"
+    directory = "/home/lapishla/Desktop/pv_videos/cropped_video/"
     file_extension = '.mp4'
     video_paths = get_paths_from_directory(directory, file_extension)
     print(f'Analyzing {len(video_paths)} videos')
