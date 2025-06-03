@@ -39,6 +39,12 @@ for ind = 1:height(video_table)
     end
     video_table.tracking{ind} = t;
 
+    %Temporary: For convenience add the corresponding oe export files.
+    %Don't do this long term because file size will be huge.
+    export_dir = OE_export + "/" + video_table.oe_export_folder(ind) ;
+    video_table.oe_events{ind} = load(export_dir + "/events.mat");
+    % video_table.oe_streams{ind} = load(export_dir + "/stream.mat");
+    video_table.oe_spikes{ind} = load(export_dir + "/spikes.mat");
 end
 
 save(csv_path+".mat", "video_table")
