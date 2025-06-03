@@ -56,24 +56,6 @@ function v_tracking = sync_single_experiment(oe_events_path, video_events_path, 
 e = load(oe_events_path);
 e = struct2table(e.data);
 v = readtable(video_events_path);
-%% plot ephys events
-figure(1); clf; hold on;
-ON = e.state==0;
-scatter(e.timestamp(ON), e.line(ON), 'filled', 'g')
-scatter(e.timestamp(~ON), double(e.line(~ON))-0.1, 'filled', 'r')
-%% plot video events
-figure(2); clf; hold on;
-ON = v.state==1;
-scatter(v.frame(ON), strcmp(v.side(ON),'R'), 'filled', 'g')
-scatter(v.frame(~ON), strcmp(v.side(~ON),'R')-.1, 'filled', 'r')
-% scatter(e.timestamp(~ON), double(e.line(~ON))-0.1, 'filled', 'r')
-%%
-%video
-sum(v.state==0 & strcmp(v.side,'R')) % 182 , 1
-sum(v.state==0 & strcmp(v.side,'L')) % 216 , 216
-% ephys
-sum(e.state==0 & e.line==1) %216 , 216 == 432
-sum(e.state==0 & e.line==2) %216 , 216 == 432
 %%
 e = sortrows(e,"timestamp","ascend");
 v = sortrows(v,"frame","ascend");
