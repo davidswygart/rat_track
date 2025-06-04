@@ -3,45 +3,26 @@ load(csv_path);
 
 % convert_to_cropped_units(video_table) % TODO: Add this at the cropping step so this isn't needed
 video_table(cellfun(@isempty, video_table.tracking), :) = []; % remove rows for which syncing failed (missing tracking info)
+video_table.trials = cell(height(video_table),1);
 for s = 1:height(video_table)
     tracking = video_table.tracking{s};
     oe_events = video_table.oe_events{s};
-    % TODO: exctract real numbers instead of the guesses below
-    sipper_xy_left = [20, 150];
-    sipper_xy_right = [480, 150];
-    
-    figure(3);clf;
-    
-    histogram(tracking.nose_likelihood)
-    title('All nose likelihood')
 
-
-    figure(4);clf;
-    histogram(tracking.probe_likelihood)
-    title('All probe likelihood')
-
-    % hist2(tracking.probe_x, tracking.probe_y)
-
-    test_if_drank_single(tracking, oe_events, sipper_xy_left, sipper_xy_right)
+    sipper_xy_left = video_table.sipper_points{s}(1,:);
+    sipper_xy_right = video_table.sipper_points{s}(2,:);
+    video_table.trials{s} = test_if_drank_single(tracking, oe_events, sipper_xy_left, sipper_xy_right);
 end
 
-
-function test_if_drank_single(tracking, oe_events, sipper_xy_left, sipper_xy_right)
-
-
-
+%% Functions
+function analyzed_trials = test_if_drank_single(tracking, oe_events, sipper_xy_left, sipper_xy_right)
 trials = get_trials(oe_events, sipper_xy_left, sipper_xy_right);
 trials = sortrows(trials,"time","ascend");
-
 for t = 1:size(trials,1)
-    test_if_drinking_trial(trials(t,:), tracking)  
+    analyzed_trials(t,:) = test_if_drinking_trial(trials(t,:), tracking);
+end
 end
 
-end
-function measure_distance(xy1, xy2)
-end
-
-function test_if_drinking_trial(trial, tracking)
+function trial = test_if_drinking_trial(trial, tracking)
 pre_time = 0;
 post_time = 8;
 
@@ -49,39 +30,34 @@ t = tracking.oe_times;
 is_trial = t>(trial.time-pre_time) & t<(trial.time+post_time);
 tracking = tracking(is_trial, :);
 
-
-likelihood_thresh = 0.7;
-prescence_thresh = 0.9;
-
-% Check nose likelihood
-l = tracking.nose_likelihood;
+% Nose: check if drank
+thresh = 100;
 x = tracking.nose_x;
 y = tracking.nose_y;
+trial.nose_did_drink = test_near_sipper(x,y, trial.sipper_xy, thresh);
+trial.nose_likelihood = mean(tracking.nose_likelihood);
 
-figure(9);clf;hold on;
-title('nose position')
-plot_position(x,y,l, trial.sipper_xy);
+% Probe: check if drank
+thresh = 100;
+x = tracking.probe_x;
+y = tracking.probe_y;
+trial.probe_did_drink = test_near_sipper(x,y, trial.sipper_xy, thresh);
+trial.probe_likelihood = mean(tracking.probe_likelihood);
 
-figure(10); clf; hold on;
-pass = test_sufficient_tracking_confidence(l,likelihood_thresh, prescence_thresh);
-title("nose uncertainty: Pass = " + string(pass));
+% mid_back: check if drank
+thresh = 100;
+x = tracking.mid_back_x;
+y = tracking.mid_back_y;
+trial.back_did_drink = test_near_sipper(x,y, trial.sipper_xy, thresh);
+trial.back_likelihood = mean(tracking.mid_back_likelihood);
+end
 
+function is_near = test_near_sipper(tx, ty, sipper, thresh)
+sx = sipper(1);
+sy = sipper(2);
 
-% Check probe likelihood
-l = tracking.probe_likelihood;
-x = tracking.nose_x;
-y = tracking.nose_y;
-
-figure(11);clf;hold on;
-title('probe position')
-plot_position(x,y,l, trial.sipper_xy);
-
-figure(12);clf;hold on;
-pass = test_sufficient_tracking_confidence(l,likelihood_thresh, prescence_thresh);
-title("probe uncertainty: Pass = " + string(pass));
-
-
-% nose_dist = measure_distance(nose_xy,sipper_xy);
+distance = sqrt( (tx-sx).^2 + (ty-sy).^2 );
+is_near = any(distance<thresh);
 end
 
 function plot_position(x,y,l, sipper_xy)
@@ -181,7 +157,17 @@ for ind = 1:size(video_table, 1)
     xy_new_pixels(:,1) = xy_relative(:,1) * new_width;
     xy_new_pixels(:,2) = xy_relative(:,2) * new_height;
 end
-
-
+end
+%%
+function video_table = parse_sipper_points(video_table)
+for ind = 1:size(video_table, 1)
+    s = video_table.sipper_points{ind};
+    xy = parse_pair_points(s);
+    video_table.sipper_points{ind} = xy;
+end
 end
 
+function xy = parse_pair_points(pair_string)
+xyxy = str2double(extract(pair_string, digitsPattern)); % TODO: save mat file with numbers so string parsing isn't needed
+xy = reshape(xyxy, [2,2])';
+end
