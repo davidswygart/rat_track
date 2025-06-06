@@ -1,4 +1,6 @@
-csv_path = "/home/lapishla/Desktop/pv_videos/Anymaze_of_interest.csv.mat";
+% csv_path = "/home/lapishla/Desktop/pv_videos/Anymaze_of_interest.csv.mat";
+csv_path = "/home/lapishla/Desktop/pv_videos/manually_curated.mat";
+export_path = "/home/lapishla/Desktop/pv_videos/analyzed_trials.mat";
 load(csv_path);
 
 % convert_to_cropped_units(video_table) % TODO: Add this at the cropping step so this isn't needed
@@ -12,6 +14,7 @@ for s = 1:height(video_table)
     sipper_xy_right = video_table.sipper_points{s}(2,:);
     video_table.trials{s} = test_if_drank_single(tracking, oe_events, sipper_xy_left, sipper_xy_right);
 end
+save(export_path, "video_table")
 
 %% Functions
 function analyzed_trials = test_if_drank_single(tracking, oe_events, sipper_xy_left, sipper_xy_right)
@@ -31,25 +34,37 @@ is_trial = t>(trial.time-pre_time) & t<(trial.time+post_time);
 tracking = tracking(is_trial, :);
 
 % Nose: check if drank
-thresh = 100;
+thresh = 25;
 x = tracking.nose_x;
 y = tracking.nose_y;
 trial.nose_did_drink = test_near_sipper(x,y, trial.sipper_xy, thresh);
 trial.nose_likelihood = mean(tracking.nose_likelihood);
 
+% figure(1);clf;hold on;
+% title('nose')
+% plot_position(x,y,tracking.nose_likelihood, trial.sipper_xy)
+
 % Probe: check if drank
-thresh = 100;
+thresh = 50;
 x = tracking.probe_x;
 y = tracking.probe_y;
 trial.probe_did_drink = test_near_sipper(x,y, trial.sipper_xy, thresh);
 trial.probe_likelihood = mean(tracking.probe_likelihood);
 
+% figure(2);clf;hold on;
+% title('probe')
+% plot_position(x,y,tracking.probe_likelihood, trial.sipper_xy)
+
 % mid_back: check if drank
-thresh = 100;
+thresh = 150;
 x = tracking.mid_back_x;
 y = tracking.mid_back_y;
 trial.back_did_drink = test_near_sipper(x,y, trial.sipper_xy, thresh);
 trial.back_likelihood = mean(tracking.mid_back_likelihood);
+
+% figure(3);clf;hold on;
+% title('back')
+% plot_position(x,y,tracking.mid_back_likelihood, trial.sipper_xy)
 end
 
 function is_near = test_near_sipper(tx, ty, sipper, thresh)
@@ -104,9 +119,9 @@ end
 
 function trials = get_trials(oe_events, sipper_xy_left, sipper_xy_right)
 ON_state = 0;
-left_sipper_line = 3;
+left_sipper_line = 4;
 L_times= get_trial_start(oe_events, left_sipper_line, ON_state);
-right_sipper_line = 4;
+right_sipper_line = 3;
 R_times= get_trial_start(oe_events, right_sipper_line, ON_state);
 n_l = length(L_times);
 n_r = length(R_times);
