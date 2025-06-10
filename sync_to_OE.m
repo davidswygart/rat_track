@@ -1,8 +1,8 @@
 video_csv = "/home/lapishla/Desktop/pv_videos/Anymaze_of_interest.csv";
-sync_all_from_csv(video_csv)
+video_table = sync_all_from_csv(video_csv);
 
 
-function sync_all_from_csv(csv_path)
+function video_table = sync_all_from_csv(csv_path)
 
 video_table = readtable(csv_path);
 % video_table = video_table(~video_table.skip, :);
@@ -65,9 +65,6 @@ for ind = 1:height(video_table)
     % video_table.oe_streams{ind} = load(export_dir + "/stream.mat");
     video_table.oe_spikes{ind} = load(export_dir + "/spikes.mat");
 end
-
-save(csv_path+".mat", "video_table")
-
 end
 
 
