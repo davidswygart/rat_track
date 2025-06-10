@@ -5,15 +5,23 @@ sync_all_from_csv(video_csv)
 function sync_all_from_csv(csv_path)
 
 video_table = readtable(csv_path);
-video_table = video_table(~video_table.skip, :);
+% video_table = video_table(~video_table.skip, :);
 
 OE_export = "/home/lapishla/Desktop/pv_videos/katieExport/export/";
 video_events_parent = "/home/lapishla/Desktop/pv_videos/cropped_video/";
 video_table.tracking = cell(height(video_table),1);
 for ind = 1:height(video_table)
+    disp(ind)
+    if video_table.skip(ind)
+        disp("skipping because the CSV told me to")
+        video_table.tracking{ind} = "skipping because the CSV told me to";
+        continue
+    end
+
     oe_events_path = OE_export + "/" + video_table.oe_export_folder(ind) + "/events.mat";
     if ~isfile(oe_events_path)
         warning("no OE event export found")
+        video_table.tracking{ind} = "skipping: no OE event export found";
         continue
     end
 
@@ -21,6 +29,7 @@ for ind = 1:height(video_table)
     video_events_path = video_events_parent + "/" + num2str(id) + "_events.csv";
     if ~isfile(video_events_path)
         warning("no video event csv found")
+        video_table.tracking{ind} = "skipping: no video event csv found";
         continue
     end
 
@@ -29,14 +38,24 @@ for ind = 1:height(video_table)
     tracking_csv = tracking_parent + num2str(id) + model_post_string;
     if ~isfile(tracking_csv)
         warning("no DLC tracking csv found")
+        video_table.tracking{ind} = "skipping: no DLC tracking csv found";
         continue
     end
 
-    try
-        t = sync_single_experiment(oe_events_path, video_events_path, tracking_csv);
-    catch
-        continue
+    if strcmp(video_table.Rig{ind}, 'A')
+        left_right_oe_lines = [2, 1];
+        disp("Rig A");
+    elseif strcmp(video_table.Rig{ind}, 'B')
+        left_right_oe_lines = [1, 2];
+        disp("Rig B");
     end
+
+
+    t = sync_single_experiment(oe_events_path, video_events_path, tracking_csv, left_right_oe_lines);
+
+        % warning("Syncing to OE events failed")
+        % continue
+
     video_table.tracking{ind} = t;
 
     %Temporary: For convenience add the corresponding oe export files.
@@ -52,7 +71,7 @@ save(csv_path+".mat", "video_table")
 end
 
 
-function v_tracking = sync_single_experiment(oe_events_path, video_events_path, tracking_csv)
+function v_tracking = sync_single_experiment(oe_events_path, video_events_path, tracking_csv, left_right_oe_lines)
 e = load(oe_events_path);
 e = struct2table(e.data);
 v = readtable(video_events_path);
@@ -62,24 +81,24 @@ v = sortrows(v,"frame","ascend");
 %% Find matching OE events and insert their timestamp
 v.oe_times(:) = nan;
 % Left ON
-v = add_oe_times(v, 1, 'L', e, 0, 2); %I checked and video L does correspond to line 2 for 2.mp4
+v = add_oe_times(v, 1, 'L', e, 0, left_right_oe_lines(1)); 
 % Left OFF
-v = add_oe_times(v, 0, 'L', e, 1, 2);
+v = add_oe_times(v, 0, 'L', e, 1, left_right_oe_lines(1));
 % Right ON
-v = add_oe_times(v, 1, 'R', e, 0, 1);
+v = add_oe_times(v, 1, 'R', e, 0, left_right_oe_lines(2));
 % Right OFF
-v = add_oe_times(v, 0, 'R', e, 1, 1);
+v = add_oe_times(v, 0, 'R', e, 1, left_right_oe_lines(2));
  
-if ~any(~isnan(v.oe_times)) % If all are nan
-    error('All are still nan. No matching events were found')
+if ~any(~isnan(v.oe_times)) % If all are nan return empty
+    warning("No events could be synced")
+    v_tracking = "skipping: No events could be synced";
+    return
+else
+    % Interpolate the tracking times based on the OE event times
+    [v_tracking, model_name] = load_tracking_csv(tracking_csv);
+    v_tracking = interp_oe_times(v, v_tracking);
+    return
 end
-
-%% Interpolate the tracking times based on the OE event times
-[v_tracking, model_name] = load_tracking_csv(tracking_csv);
-v_tracking = interp_oe_times(v, v_tracking);
-% save_file = erase(tracking_csv, '.csv') + "_synced.mat";
-
-% save(save_file, 'v_tracking', 'model_name')
 end
 
 %% functions
@@ -88,6 +107,10 @@ not_nan = ~isnan(events.oe_times);
 x = events.frame(not_nan);
 v = events.oe_times(not_nan);
 xq = tracking.frame;
+
+[x,~,idx] = unique(x,'stable'); % check for duplicate values of x
+v = accumarray(idx,v,[],@mean); % use mean v for duplicate x values
+
 tracking.oe_times = interp1(x,v,xq, 'linear','extrap');
 end
 
