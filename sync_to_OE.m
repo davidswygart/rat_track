@@ -2,6 +2,7 @@ video_csv = "/home/lapishla/Desktop/pv_videos/Anymaze_of_interest.csv";
 video_table = sync_all_from_csv(video_csv);
 
 
+%% functions
 function video_table = sync_all_from_csv(csv_path)
 
 video_table = readtable(csv_path);
@@ -67,7 +68,6 @@ for ind = 1:height(video_table)
 end
 end
 
-
 function v_tracking = sync_single_experiment(oe_events_path, video_events_path, tracking_csv, left_right_oe_lines)
 e = load(oe_events_path);
 e = struct2table(e.data);
@@ -98,7 +98,6 @@ else
 end
 end
 
-%% functions
 function tracking = interp_oe_times(events, tracking)
 not_nan = ~isnan(events.oe_times);
 x = events.frame(not_nan);
@@ -155,7 +154,6 @@ scatter(v_frames, e_times)
 xlabel('video frame')
 ylabel('ephys time (s)')
 end
-
 
 function pattern_diff = plot_diff_patterns(v_frames, e_times)
     figure(1); clf; hold on;
