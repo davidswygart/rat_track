@@ -1,6 +1,6 @@
-% csv_path = "/home/lapishla/Desktop/pv_videos/Anymaze_of_interest.csv.mat";
-csv_path = "/home/lapishla/Desktop/pv_videos/manually_curated.mat";
-export_path = "/home/lapishla/Desktop/pv_videos/analyzed_trials.mat";
+clear
+csv_path = "/home/lapishla/Desktop/pv_videos/Anymaze_of_interest.csv.mat";
+export_path = "/home/lapishla/Desktop/pv_videos/trials.mat";
 load(csv_path);
 
 % convert_to_cropped_units(video_table) % TODO: Add this at the cropping step so this isn't needed
@@ -10,11 +10,22 @@ for s = 1:height(video_table)
     tracking = video_table.tracking{s};
     oe_events = video_table.oe_events{s};
 
-    sipper_xy_left = video_table.sipper_points{s}(1,:);
-    sipper_xy_right = video_table.sipper_points{s}(2,:);
-    video_table.trials{s} = test_if_drank_single(tracking, oe_events, sipper_xy_left, sipper_xy_right);
+    if isempty(oe_events) | ~istable(tracking)
+        % warning('skipping: missing OE events or tracking data')
+        continue
+    end
+
+
+    sipper_xy = parse_pair_points(video_table.sipper_points{s});
+    sipper_xy_left = sipper_xy(1,:);
+    sipper_xy_right = sipper_xy(2,:);
+    try
+        video_table.trials{s} = test_if_drank_single(tracking, oe_events, sipper_xy_left, sipper_xy_right);
+    catch
+        warning('trial analysis failed at ind =  %d', s)
+    end
 end
-save(export_path, "video_table")
+% save(export_path, "video_table")
 
 %% Functions
 function analyzed_trials = test_if_drank_single(tracking, oe_events, sipper_xy_left, sipper_xy_right)
