@@ -17,6 +17,7 @@ for s = 1:height(video_table)
     video_table.manually_curated(s) = {did_drink};
     save(export_path, "video_table")
 end
+disp("YOU ARE DONE!!!!")
 
 %% Functions
 function frames = convert_oe_time_to_frame(oe_time, sync)
