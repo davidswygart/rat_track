@@ -1,10 +1,13 @@
 import cv2
 import pandas as pd
+import sys
 
+
+# Requires csv file path as first argument
 def main():
     print("Starting the script...")
     # Read the CSV file
-    csv_file = 'DLC_PV2CAP - Anymaze_of_interest.csv'
+    csv_file = sys.argv[1]
     df = pd.read_csv(csv_file)
 
     # Initialize columns for coordinates
