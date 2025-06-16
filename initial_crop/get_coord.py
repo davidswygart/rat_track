@@ -1,7 +1,29 @@
 import cv2
 import pandas as pd
-print("starting script")
-# Function to display the first frame and allow user to select points
+
+def main():
+    print("Starting the script...")
+    # Read the CSV file
+    csv_file = 'DLC_PV2CAP - Anymaze_of_interest.csv'
+    df = pd.read_csv(csv_file)
+
+    # Initialize columns for coordinates
+    df['corner_points'] = ''
+    df['light_points'] = ''
+
+    # Loop through each video file path
+    for index, row in df.iterrows():
+        video_path = row['full_file']
+        print(f"Processing: {video_path}")
+        points = select_points(video_path)
+        if points:
+            df.at[index, 'corner_points'] = str(points['corner'])
+            df.at[index, 'light_points'] = str(points['light'])
+            
+        # Save the updated CSV file
+        df.to_csv('updated_video_paths.csv', index=False)
+        print("Updated CSV file saved as 'updated_video_paths.csv'.")
+
 def select_points(video_path):
     cap = cv2.VideoCapture(video_path)
     ret, frame = cap.read()
@@ -45,24 +67,6 @@ def select_points(video_path):
                 cv2.destroyAllWindows()
                 return points
 
-# Read the CSV file
-csv_file = 'DLC_PV2CAP - Anymaze_of_interest.csv'
-df = pd.read_csv(csv_file)
 
-# Initialize columns for coordinates
-df['corner_points'] = ''
-df['light_points'] = ''
-
-# Loop through each video file path
-for index, row in df.iterrows():
-    video_path = row['full_file']
-    print(f"Processing: {video_path}")
-    points = select_points(video_path)
-    if points:
-        df.at[index, 'corner_points'] = str(points['corner'])
-        df.at[index, 'light_points'] = str(points['light'])
-        
-    # Save the updated CSV file
-    df.to_csv('updated_video_paths.csv', index=False)
-    print("Updated CSV file saved as 'updated_video_paths.csv'.")
-
+if __name__ == "__main__":
+    main()
