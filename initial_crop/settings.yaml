@@ -1,0 +1,9 @@
+points_of_interest:
+- light_left
+- sipper_left
+- light_right
+- sipper_right
+- corner_top_left
+- corner_top_right
+- corner_bottom_right
+- corner_bottom_left

@@ -1,7 +1,8 @@
 import cv2
 import pandas as pd
 import sys
-
+import yaml
+import os
 
 # Requires csv file path as first argument
 def main():
@@ -10,63 +11,60 @@ def main():
     csv_file = sys.argv[1]
     df = pd.read_csv(csv_file)
 
-    # Initialize columns for coordinates
-    df['corner_points'] = ''
-    df['light_points'] = ''
+    yaml_file = os.path.dirname(__file__) + '/settings.yaml'
+    with open(yaml_file, 'r') as f:
+        settings = yaml.safe_load(f)
+    point_names = settings['points_of_interest']
 
     # Loop through each video file path
-    for index, row in df.iterrows():
-        video_path = row['full_file']
+    points = []
+    for video_path in df.video_path:
         print(f"Processing: {video_path}")
-        points = select_points(video_path)
-        if points:
-            df.at[index, 'corner_points'] = str(points['corner'])
-            df.at[index, 'light_points'] = str(points['light'])
-            
-        # Save the updated CSV file
-        df.to_csv('updated_video_paths.csv', index=False)
-        print("Updated CSV file saved as 'updated_video_paths.csv'.")
+        points.append(select_points(video_path, point_names))
 
-def select_points(video_path):
+    df['poi_names'] = point_names
+    df['poi_xy_raw'] = points    
+    # Save the updated CSV file
+    df.to_csv(csv_file, index=False)
+    print(f"saved: {csv_file}")
+
+def select_points(video_path, point_names):
     cap = cv2.VideoCapture(video_path)
     ret, frame = cap.read()
     if not ret:
         print(f"Failed to read video: {video_path}")
         return None
-
-    clone = frame.copy()
-    points = {'corner': [], 'light': []}
-    temp_points = []
+    
+    points = []
+    def show_frame():
+        for p in points:
+            cv2.circle(frame, p, 5, (0, 255, 0), -1)
+        cv2.imshow('Frame', frame)
+        if len(points) >= len(point_names):
+            print("All points selected.")
+            print("Click 'r' to restart selection or SPACE to confirm and exit.")
+        else:
+            print(f"Click {point_names[len(points)]}")
 
     def click_event(event, x, y, flags, param):
-        nonlocal frame
-        if event == cv2.EVENT_LBUTTONDOWN:
-            if len(temp_points) < 6:
-                temp_points.append((x, y))
-                print("select the 4 corner points")
-                if len(temp_points) <= 4:
-                    points['corner'].append((x, y))
-                    cv2.circle(frame, (x, y), 5, (255, 0, 0), -1)  # Blue for corners
-                else:
-                    print("select the 2 lights")
-                    points['light'].append((x, y))
-                    cv2.circle(frame, (x, y), 5, (0, 0, 255), -1)  # Red for lights
-                cv2.imshow('Frame', frame)
+        if len(points) < len(point_names):
+            if event == cv2.EVENT_LBUTTONDOWN:
+                points.append((x, y))
+                show_frame()
 
+
+    print("Click 'r' to restart selection or SPACE to confirm and exit.")
+    show_frame()
+    cv2.setMouseCallback('Frame', click_event)
+    
     while True:
-        frame = clone.copy()
-        temp_points.clear()
-        points['corner'].clear()
-        points['light'].clear()
-
-        cv2.imshow('Frame', frame)
-        cv2.setMouseCallback('Frame', click_event)
-
-        while True:
-            key = cv2.waitKey(0)
-            if key == ord('r'):
-                break  # Restart selection
-            elif key == 32:  # SPACE key to confirm and exit
+        key = cv2.waitKey(0)
+        if key == ord('r'):
+            return select_points(video_path, point_names)
+        elif key == 32:  # SPACE key to confirm and exit
+            if len(points) < len(point_names):
+                print("Not enough points selected. Please select all points.")
+            else:
                 cv2.destroyAllWindows()
                 return points
 
