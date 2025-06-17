@@ -22,7 +22,7 @@ def main():
         print(f"Processing: {video_path}")
         points.append(select_points(video_path, point_names))
 
-    df['poi_names'] = point_names
+    df['poi_names'] = [point_names] * len(df)
     df['poi_xy_raw'] = points    
     # Save the updated CSV file
     df.to_csv(csv_file, index=False)
