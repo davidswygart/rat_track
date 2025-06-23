@@ -3,3 +3,11 @@ points_of_interest:
 - sipper_left
 - sipper_right
 - light_right
+
+crop:
+  x_points:
+  - light_left
+  - light_right
+  x_margin: 0.05 # Extra space to the left and right of x_points given as a proportion of the distance between x_points
+  x_pixels: 500
+  y_pixels: 300
