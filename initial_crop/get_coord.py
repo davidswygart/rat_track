@@ -18,49 +18,60 @@ def main():
 
     # Loop through each video file path
     points = []
-    for video_path in df.video_path:
-        print(f"Processing: {video_path}")
-        points.append(select_points(video_path, point_names))
+    frame_size = []
+    for row in df.itertuples():
+        print(f"Processing: {row.video_path}")
+        frame = get_frame(row.video_path, row.flip_xy)
+        if frame is None:
+            print(f"Error getting frame. skipping {row.video_path}")
+            frame_size.append(None)
+            points.append(None)
+        else:
+            frame_size.append((frame.shape[1], frame.shape[0]))
+            points.append(select_points(frame, point_names))
 
     df['poi_names'] = [point_names] * len(df)
-    df['poi_xy_raw'] = points    
+    df['frame_size_original'] = frame_size
+    df['poi_xy_original'] = points    
     # Save the updated CSV file
     df.to_csv(csv_file, index=False)
     print(f"saved: {csv_file}")
 
-def select_points(video_path, point_names):
-    cap = cv2.VideoCapture(video_path)
-    ret, frame = cap.read()
-    if not ret:
-        print(f"Failed to read video: {video_path}")
-        return None
-    
+def get_frame(file, flip=False):
+    ret, frame = cv2.VideoCapture(file).read()
+    if ret & flip:
+        return frame[::-1, ::-1] # Flip x and y dimensions (same as rotating 180 degrees)
+    else:
+        return frame
+
+def select_points(frame, point_names):    
+    f = frame.copy() # save original frame in case the user needs to restart
     points = []
-    def show_frame():
-        for p in points:
-            cv2.circle(frame, p, 5, (0, 255, 0), -1)
-        cv2.imshow('Frame', frame)
-        if len(points) >= len(point_names):
+
+    def prompt_next_click():
+        if len(points) < len(point_names):
+            print(f"Click {point_names[len(points)]}, or type 'r' to restart selection")
+            cv2.setMouseCallback('Frame', click_event)
+        else:
             print("All points selected.")
             print("Click 'r' to restart selection or SPACE to confirm and exit.")
-        else:
-            print(f"Click {point_names[len(points)]}")
+            cv2.setMouseCallback('Frame', lambda *args : None)
 
     def click_event(event, x, y, flags, param):
-        if len(points) < len(point_names):
-            if event == cv2.EVENT_LBUTTONDOWN:
-                points.append((x, y))
-                show_frame()
+        if event == cv2.EVENT_LBUTTONDOWN:
+            points.append((x, y))
+            cv2.circle(f, (x,y), 5, (0,255,0), -1)
+            cv2.imshow('Frame', f)
+            prompt_next_click()
 
-
-    print("Click 'r' to restart selection or SPACE to confirm and exit.")
-    show_frame()
-    cv2.setMouseCallback('Frame', click_event)
+    cv2.imshow('Frame', f)
+    prompt_next_click()
     
     while True:
         key = cv2.waitKey(0)
         if key == ord('r'):
-            return select_points(video_path, point_names)
+            cv2.destroyAllWindows()
+            return select_points(frame, point_names)
         elif key == 32:  # SPACE key to confirm and exit
             if len(points) < len(point_names):
                 print("Not enough points selected. Please select all points.")
