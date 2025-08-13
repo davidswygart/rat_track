@@ -3,40 +3,30 @@ import cv2
 import numpy as np
 import pandas as pd
 import os
+import sys
+from utilities import load_settings, get_video_info, overwrite_video_info, select_points
 
-def main():
-    directory = "/home/lapishla/Desktop/pv_videos/cropped_video/"
-    file_extension = '.mp4'
-    video_paths = get_paths_from_directory(directory, file_extension)
-    print(f'Analyzing {len(video_paths)} videos')
-    for path in video_paths:
-        events= get_events(path)
-        export_path= path.strip(file_extension) + '_events.csv'
+
+def main(job_folder):
+    video_info = get_video_info(job_folder)
+    point_names = ["left light", "right light"]
+
+    for path in video_info.cropped_path:
+        points = select_points(path, point_names)
+        events= get_events(path, points)
+        export_path= path + '_light_events.csv'
         events.to_csv(export_path)
         print(f'exported {export_path}')
 
-def get_paths_from_directory(directory, file_extension=''):
-    file_paths = []
-    for filename in os.listdir(directory):
-        if filename.endswith(file_extension):
-            file_paths.append(os.path.join(directory, filename))
-    return file_paths
 
-def get_events(video_path):
-    # constant values for left and right lights
-    height=50
-    y=150 - int(height/2)
-    width=10  
-
+def get_events(video_path, points):
     # analyze left light
-    x=0
-    luminosity = measure_luminosity(video_path, x, y, width, height)
+    luminosity = measure_luminosity(video_path, points[0])
     (L_frame, L_state) = analyze_signal(luminosity)
     print(f'{len(L_frame)} events found for left light')
 
     # analyze right light
-    x=500
-    luminosity = measure_luminosity(video_path, x, y, width*-1, height)
+    luminosity = measure_luminosity(video_path, points[1])
     (R_frame, R_state)  = analyze_signal(luminosity)
     print(f'{len(R_frame)} events found for right light')
 
@@ -45,26 +35,35 @@ def get_events(video_path):
     state = L_state + R_state
     side = ['L']*len(L_state) + ['R']*len(R_state)
 
-    dict = {'frame':frame, 'state':state, 'side':side}
-    table = pd.DataFrame(dict)
+    table = pd.DataFrame({'frame':frame, 'state':state, 'side':side})
     table = table.sort_values(by='frame')
     return table
 
-def measure_luminosity(video_path, x, y, width, height):
+def measure_luminosity(video_path, point):
     """
     Opens a video file and measures the average luminosity in a rectangular region.
     Args:
         video_path (str): Path to the video file.
-        x (int): X-coordinate of starting point in pixels.
-        y (int): Y-coordinate of starting point in pixels.
-        width (int): Width of the rectangular region (can be negative).
-        height (int): Height of the rectangular region (can be negative).
+        point (list): XY point of light
     Returns:
         List of average luminosity values per frame.
     """
     cap = cv2.VideoCapture(video_path)
+
+    # Choose width and height of bounding box
+    frame_width = int(cap.get(cv2.CAP_PROP_FRAME_WIDTH))
+    frame_height = int(cap.get(cv2.CAP_PROP_FRAME_HEIGHT))
+    width = 0.03*frame_width
+    height = 0.1*frame_height
+
+    # calculate x and y range, while staying in frame size
+    x_min = max(int(point[0] - width/2), 0)
+    x_max = min(int(point[0] + width/2), frame_width)
+    y_min = max(int(point[1] - height/2), 0)
+    y_max = min(int(point[1] + height/2), frame_height)
+   
+
     avg_luminosity_values = []
-    # avg_background = []
     if not cap.isOpened():
         print("Error: Could not open video file.")
         return avg_luminosity_values
@@ -72,31 +71,15 @@ def measure_luminosity(video_path, x, y, width, height):
         ret, frame = cap.read()
         if not ret:
             break  # End of video
-        # Convert frame to grayscale for luminosity measurement
         gray_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
-        # Compute min/max bounds, handling negative width/height
-        x_min = min(x, x + width)
-        x_max = max(x, x + width)
-        y_min = min(y, y + height)
-        y_max = max(y, y + height)
-        # Ensure bounds remain within frame limits
-        x_min = max(0, x_min)
-        x_max = min(frame.shape[1], x_max)
-        y_min = max(0, y_min)
-        y_max = min(frame.shape[0], y_max)
-        # Extract the pixel region using NumPy slicing
         region = gray_frame[y_min:y_max, x_min:x_max]
-        # Compute the average luminosity in the defined area
         avg_region = np.mean(region)
-        # avg_frame = np.mean(gray_frame)
         avg_luminosity_values.append(avg_region)
-        # avg_background.append(avg_frame)
 
         # import matplotlib.pyplot as plt
         # plt.imshow(region)
         # plt.show()
     cap.release()
-    # return (avg_luminosity_values, avg_background)
     return avg_luminosity_values
 
 def analyze_signal(signal, threshold=3, smooth=True, window_size=3, plot=False, xlim=None):
@@ -177,4 +160,5 @@ def get_mp4_files(directory):
     return mp4_files
 
 if __name__ == "__main__":
-    main()
+    job_folder = sys.argv[1]
+    main(job_folder)
