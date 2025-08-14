@@ -1,6 +1,6 @@
 crop:
-  x_margin: 0.1 # margin as a proportion of the distance between x_points
-  cropped_size: [ 500, 300 ]
+  x_margin: 0.2 # margin as a proportion of the distance between x_points
+  cropped_size: [ 640, 480 ]
 
 points_of_interest:
 - light_left
