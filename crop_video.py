@@ -16,36 +16,60 @@ def main(job_folder):
     video_info['cropped_path'] =  [os.path.join(export_dir,id+'.mp4') for id in video_info.id]
 
     crop_settings = load_settings(job_folder)['crop']
+    all_commands = []
+    point_names = ["upper left", "lower right"]
     for r in video_info.itertuples():
-        # interactively choose cropping points
-        point_names = ["upper left", "lower right"]
-        points = select_points(r.video_path, point_names)
+        try:
+            # interactively choose cropping points
+            points = select_points(r.video_path, point_names)
 
-        # cropping string
-        c = calc_crop_coordinates(points, crop_settings)
-        crop = f"crop={c.width}:{c.height}:{c.x_start}:{c.y_start}"
+            # cropping string
+            c = calc_crop_coordinates(points, crop_settings)
+            crop = f"crop={c.width}:{c.height}:{c.x_start}:{c.y_start}"
 
-        # scaling string
-        sz = crop_settings['cropped_size']
-        scale = f"scale={sz[0]}:{sz[1]}"
+            # scaling string
+            sz = crop_settings['cropped_size']
+            scale = f"scale={sz[0]}:{sz[1]}"
 
-        # filter chain string
-        filter_chain = f"{crop},{scale}"
-        if (r.flip_xy):
-            filter_chain = filter_chain + ",hflip,vflip"
-        
-        # Full FFmpeg command
-        ffmpeg_cmd = [
-            "ffmpeg",
-            "-y", #automatically overwrite
-            "-i", r.video_path,
-            "-vf", filter_chain,
-            "-c:a", "copy",
-            "-an",
-            r.cropped_path
-        ]
-        subprocess.run(ffmpeg_cmd, check=True)
+            # filter chain string
+            filter_chain = f"{crop},{scale}"
+            if (r.flip_xy):
+                filter_chain = filter_chain + ",hflip,vflip"
+            
+            # Full FFmpeg command
+            ffmpeg_cmd = [
+                "ffmpeg",
+                "-y", #automatically overwrite
+                "-i", r.video_path,
+                "-vf", filter_chain,
+                "-c:a", "copy",
+                "-an",
+                r.cropped_path
+            ]
+            all_commands.append(ffmpeg_cmd)
+        except:
+            print(f"error with {r.video_path}")
+    
+    with open("ffmpeg_commands.txt", "w") as file:
+        for item in all_commands:
+            file.write(str(item) + "\n")
+    
+    processes = []
+    for c in all_commands:
+        # subprocess.run(c, check=True)
         print(f"Successfully processed: {r.cropped_path}")
+        p = subprocess.Popen(c, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
+        processes.append(p)
+    print("All subprocesses launched.")
+
+    # Wait for all processes to complete and collect their output
+    for i, proc in enumerate(processes):
+        stdout, stderr = proc.communicate()
+        print(f"Output from Task {i+1}:\n{stdout.strip()}")
+        if stderr:
+            print(f"Error from Task {i+1}:\n{stderr.strip()}")
+    print("All subprocesses completed.")
+
     overwrite_video_info(job_folder, video_info)
 
 
