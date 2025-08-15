@@ -15,7 +15,8 @@ def load_settings(job_folder):
     if os.path.exists(custom_yaml):
         with open(custom_yaml, 'r') as f:
             custom_settings = yaml.safe_load(f)
-        settings.update(custom_settings)    
+        if custom_settings: #If any settings were found in the yaml
+            settings.update(custom_settings)    
     return settings
 
 
@@ -30,8 +31,13 @@ def overwrite_video_info(job_folder, video_info):
 
 def select_points(video_path, point_names):
     ret, frame = cv2.VideoCapture(video_path).read()  
+    if not ret:
+        return None
     f = frame.copy() # save original frame in case the user needs to restart
+    
     points = []
+    if not point_names:
+        return points
 
     def prompt_next_click():
         if len(points) < len(point_names):
