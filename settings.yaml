@@ -1,5 +1,5 @@
 crop:
-  x_margin: 0.2 # margin as a proportion of the distance between x_points
+  x_margin: 0.01 # margin as a proportion of the distance between x_points
   cropped_size: [ 640, 480 ]
 
 points_of_interest:
@@ -7,3 +7,7 @@ points_of_interest:
 - sipper_left
 - sipper_right
 - light_right
+- corner_UL
+- corner_UR
+- corner_LR
+- corner_LL
