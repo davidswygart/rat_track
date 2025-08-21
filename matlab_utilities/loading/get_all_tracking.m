@@ -14,8 +14,7 @@ function tracking = get_all_tracking(job_folder, id)
     tracking = cat(2, tracking, skeleton);
 
     % load frame to OE time syncing data
-    file = [job_folder filesep 'oe_sync' filesep id '_oe_sync.csv'];
-    oe_sync = readtable(file, 'Delimiter', ',');
+    oe_sync = load_oe_video_sync(job_folder,id);
     tracking.time = oe_sync.time;
 end
 
