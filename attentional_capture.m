@@ -2,14 +2,14 @@
 
 %%
 sip_lines = [4,3]; % OE event lines corresponding to L and R sippers
-pre_time = 6; %time before sipper (light should start 5s prior)
-post_time = 8; %time after sipper (sipper stays out for 8s)
+pre_time = 5; %time before sipper (light should start 5s prior)
+post_time = 5; %time after sipper (sipper stays out for 8s)
 
 job_folder = pwd;
 csv_path = [job_folder filesep 'videos.csv'];
 video_table = readtable(csv_path, 'Delimiter', ',');
 
-for ind=1:height(video_table)
+for ind=1:1%height(video_table)
     id = video_table.id{ind};
 
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
@@ -22,62 +22,133 @@ for ind=1:height(video_table)
     tracking = get_all_tracking(job_folder, id);
     [time, is_L] = get_trial_times(oe_events, sip_lines);
 
-    for ind_t = 1:length(time)
+    for ind_t = 11:11%length(time)
         t=time(ind_t);
-
-
-        pre_light = split_by_time(tracking, [t-6,t-5]); %1s prior to light
-        mid_light = split_by_time(tracking, [t-5,t-1]);% 4s of light
-        sip_wait = split_by_time(tracking, [t-1,t;]); % 1s waiting period
         trial = split_by_time(tracking, [t-pre_time,t+post_time]);
+        t_time = trial.time - t;
         
         if is_L(ind_t)
             light = poi{{'light_left'},:};
+            sipper = poi{{'sipper_left'}, :};
         else
             light = poi{{'light_right'},:};
+            sipper = poi{{'sipper_right'}, :};
         end
 
         % figure(3); clf; hold on;
         % trial_video(trial,video_path)
 
-        % figure(1); clf; hold on;
+        % light_start = [-5;-4;-3;-2];
+        % light_stop = light_start+0.25;
+        light_start = -5;
+        light_stop = light_start+4;
+
+        c_light = [252,186,3]/255; % orange
+        c_wait = ones(1,3) * 1; % white
+        c_sip = [130,255,100]/255; % light green
+
+        c_gaze = [127,0,255]/255;% purple
+        c_dist = [0,102,204]/255; % cyan
+
+
+        figure(1); clf; hold on;
+        % f= trial.frame(diff(t_time<-1)<0)+2; %last frame of CS+
+        t_of_interest = -2.95;
+        [~, interest_ind] = min(abs(t_time - t_of_interest));
+        f= trial.frame(interest_ind); 
+        display_frame(video_path, f)
+        hold on;
+
         % scatter(light(:,1), light(:,2), 'filled','red')
+        plot_corners(poi)
+        text(light(:,1), light(:,2),'L',color="white",FontWeight='bold', HorizontalAlignment='center', VerticalAlignment='middle')
+        text(sipper(:,1), sipper(:,2),'S',color="white",FontWeight='bold', HorizontalAlignment='center', VerticalAlignment='middle')
         % plot_gaze(pre_light, "magenta");
-        % plot_gaze(mid_light, "cyan");
-        % plot_gaze(sip_wait, "blue");
-        % xlim([1,640])
-        % ylim([1,480])
-        % daspect([1 1 1])
+        % plot_gaze(mid_light, c_light);
+        % plot_gaze(sip_wait, c_wait);
+        % plot_gaze(sip_post, c_sip);
+        color = repmat(c_wait, height(trial),1);
+        for i=1:length(light_start)
+            is_L = t_time>=light_start(i) & t_time<light_stop(i);
+            color(is_L,:) = repmat(c_light, sum(is_L), 1);
+        end
+        
+        is_S = t_time>=0 & t_time<8;
+        color(is_S,:) = repmat(c_sip, sum(is_S), 1);
+        plot_gaze(trial, color);
+        xlim([1,640])
+        ylim([1,480])
+        daspect([1 1 1])
+        %scale bar
+        bar_length = 75;
+        x=400;
+        x = [x, x+bar_length/scale_factor(poi)];
+        y=[375,375];
+        plot(x,y, 'k', LineWidth=3)
+        text(mean(x),y(1),'75 mm',FontWeight='bold',HorizontalAlignment='center',VerticalAlignment='bottom')
         % title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
+        axis off
 
-        % trial_video(trial_track,light,video_path);
-
-        t_time = trial.time - t;
         gaze_angle = calc_gaze_angle(trial);
         light_angle = calc_angle_to_light(trial, light);
         gaze_diff =  gaze_angle - light_angle;
+        % gaze_diff =  gaze_angle - calc_angle_to_light(trial, sipper);
+
         gaze_diff = abs(mod(gaze_diff+180,360)-180);
 
 
+        sip_dist_pix = calc_dist_to_sipper(trial, sipper);
+        sip_dist_mm = sip_dist_pix*scale_factor(poi);
+
         figure(2); clf; hold on;
         % light rectangle and text
-        rectangle(Position=[-5,0,4,180], FaceColor='yellow', EdgeColor='yellow')
-        text(-6/2, 178, 'CS+', HorizontalAlignment='center', VerticalAlignment='top')
+        for i=1:length(light_start)
+            width = light_stop(i) - light_start(i);
+            rectangle(Position=[light_start(i),0,width,180], FaceColor=c_light, EdgeColor=c_light)
+            text(light_start(i)+width/2, 178, 'CS+', HorizontalAlignment='center', VerticalAlignment='top')
+        end
+         % wait rectangle
+        rectangle(Position=[-1,0,1,180], FaceColor=c_wait, EdgeColor=c_wait)
         % sipper rectangle and text
-        color = ones(3,1) * 0.8;
-        rectangle(Position=[0,0,8,180], FaceColor=color, EdgeColor=color)
-        text(8/2 , 178, 'sipper', HorizontalAlignment='center', VerticalAlignment='top')
+        rectangle(Position=[0,0,8,180], FaceColor=c_sip, EdgeColor=c_sip)
+        text(post_time/2 , 178, 'sipper', HorizontalAlignment='center', VerticalAlignment='top')
         % plot gaze_diff
-        plot(t_time, gaze_diff)
-
-        xlabel("time before sipper (s)")
+        plot(t_time, gaze_diff, LineWidth=3, Color=c_gaze)
         ylabel("Gaze offset from CS+ (°)")
         ylim([0,180])
-        title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
-
+        % plot distance from sipper
+        yyaxis right
+        plot(t_time, sip_dist_mm, LineWidth=3, Color=c_dist)
+        ylabel("Distance to sipper (mm)")
+        ylim([0 420])
+        xlim([-pre_time,post_time])
+        xlabel("time before sipper (s)")
+        ax = gca;
+        ax.YAxis(1).Color = c_gaze;
+        ax.YAxis(2).Color = c_dist;
+        % title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
+        xline(t_time(interest_ind), '--')
+        set(gca, 'Layer','top')
         pause(1);
     end
 end
+function plot_corners(poi)
+    xy = poi{{'corner_LL', 'corner_LR', 'corner_UR', 'corner_UL','corner_LL'},:};
+    plot(xy(:,1), xy(:,2), '--k')
+end
+
+function f = scale_factor(poi)
+    known_sipper_dist_mm = 420;
+    v = poi{'sipper_left',:} - poi{'sipper_right',:};
+    dist_pixels = sqrt(sum(v.^2, 2));
+    f = known_sipper_dist_mm / dist_pixels;
+end
+function sip_dist = calc_dist_to_sipper(trial, sipper)
+    midpoint = calc_head_midpoint(trial);
+    v = midpoint-sipper;
+    sip_dist = sqrt(sum(v.^2, 2));
+end
+
 function track = split_by_time(track, tlim)
     is_trial = track.time>tlim(1) & track.time<tlim(2);
     track = track(is_trial,:);
@@ -87,18 +158,19 @@ function plot_gaze(track, color)
     
     midpoint = calc_head_midpoint(track);
 
-    % scale = abs(diff(gaze_angle)) / 2;
-    scale = 30;
-
-    gaze_angle = gaze_angle(1:end-1);
-    midpoint=midpoint(1:end-1,:);
+    scale = abs(mod(diff(gaze_angle)+180, 360)-180);
+    scale = (scale+1) * 2;
+    scale = [0;scale];% first scale is unknown without angle difference
+    % scale = 30;
     dx = scale .* cosd(gaze_angle);
     dy = scale .* sind(gaze_angle);
-    x = midpoint(:,1);
-    y = midpoint(:,2);
-    h = quiver(x,y,dx,dy,0, Color=color);
-    h.LineWidth = 3;
-    
+
+    for i=1:length(gaze_angle)
+        h=quiver(midpoint(i,1),midpoint(i,2),dx(i),dy(i),0);
+        h.Color = color(i,:);
+        h.LineWidth = 2;
+    end
+
 end
 
 function trial_video(t,video_path)
@@ -124,6 +196,7 @@ function display_frame(video_path, frame)
 
     vidObj.CurrentTime = (frame - 1)/vidObj.FrameRate + time_offset;
     frame = readFrame(vidObj);
+    frame = rgb2gray(frame);
     imshow(frame);
 end
 
