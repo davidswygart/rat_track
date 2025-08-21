@@ -5,23 +5,27 @@ import glob
 import sys
 
 def main(job_folder):
-    config = "/home/lapishla/Desktop/pv2cap-2-2025-05-28/config.yaml" # TODO make not hard coded. Put model in repository?
+    config = "/home/lapishla/Desktop/dlc-ephys/config.yaml" # TODO make not hard coded. Put model in repository?
     videos = os.path.join(job_folder, "videos")
     destfolder = os.path.join(job_folder, "dlc_results")
     os.makedirs(destfolder, exist_ok=True)
+
+    shuffle = 1
 
     deeplabcut.analyze_videos(
         config=config,
         videos=videos,
         destfolder=destfolder,
-        save_as_csv=True
+        save_as_csv=True,
+        shuffle=shuffle
     )
 
     deeplabcut.filterpredictions(
         config=config,
         video=videos,
         destfolder=destfolder,
-        save_as_csv=True
+        save_as_csv=True,
+        shuffle=shuffle
     )
 
     deeplabcut.plot_trajectories(
@@ -29,19 +33,22 @@ def main(job_folder):
         videos=videos,
         destfolder=destfolder,
         filtered=True,
-        pcutoff = None
+        pcutoff = None,
+        shuffle=shuffle
     )
+
 
     deeplabcut.create_labeled_video(
         config=config,
         videos=videos,
         destfolder=destfolder,
         filtered=True,
-        trailpoints = 3,
+        trailpoints = 1,
         pcutoff = 0,
         overwrite = True,
         dotsize=1,
         draw_skeleton=True,
+        shuffle=shuffle
     )
 
     deeplabcut.analyzeskeleton(
@@ -49,7 +56,8 @@ def main(job_folder):
         videos=videos,
         destfolder=destfolder,
         save_as_csv=True,
-        filtered=True
+        filtered=True,
+        shuffle=shuffle
     )
 
     organize_results(destfolder)
