@@ -14,8 +14,7 @@ c_dist = [0,102,204]/255; % cyan
 
 %%
 job_folder = pwd;
-csv_path = [job_folder filesep 'videos.csv'];
-video_table = readtable(csv_path, 'Delimiter', ',');
+video_table = load_video_csv(job_folder);
 
 for ind=1:1%height(video_table)
     id = video_table.id{ind};
