@@ -1,7 +1,18 @@
 sip_lines = [4,3]; % OE event lines corresponding to L and R sippers
+
+%% set time of interest
 pre_time = 5; %time before sipper (light should start 5s prior)
 post_time = 5; %time after sipper (sipper stays out for 8s)
 
+%% set colors
+c_light = [252,186,3]/255; % orange
+c_wait = ones(1,3) * 1; % white
+c_sip = [130,255,100]/255; % light green
+
+c_gaze = [127,0,255]/255;% purple
+c_dist = [0,102,204]/255; % cyan
+
+%%
 job_folder = pwd;
 csv_path = [job_folder filesep 'videos.csv'];
 video_table = readtable(csv_path, 'Delimiter', ',');
@@ -40,14 +51,6 @@ for ind=1:1%height(video_table)
         % light_stop = light_start+0.25;
         light_start = -5;
         light_stop = light_start+4;
-
-        c_light = [252,186,3]/255; % orange
-        c_wait = ones(1,3) * 1; % white
-        c_sip = [130,255,100]/255; % light green
-
-        c_gaze = [127,0,255]/255;% purple
-        c_dist = [0,102,204]/255; % cyan
-
 
         figure(1); clf; hold on;
         % f= trial.frame(diff(t_time<-1)<0)+2; %last frame of CS+
@@ -93,7 +96,6 @@ for ind=1:1%height(video_table)
         % gaze_diff =  gaze_angle - calc_angle_to_light(trial, sipper);
 
         gaze_diff = abs(mod(gaze_diff+180,360)-180);
-
 
         sip_dist_pix = calc_dist_to_sipper(trial, sipper);
         sip_dist_mm = sip_dist_pix*scale_factor(poi);
