@@ -1,174 +1,161 @@
-video_csv = "/home/lapishla/Desktop/pv_videos/Anymaze_of_interest.csv";
-video_table = sync_all_from_csv(video_csv);
+% create sync file for each video listed in videos.csv
+% sync file is csv with times frame and oe
 
+job_folder = pwd;
+csv_path = [job_folder filesep 'videos.csv'];
+video_table = readtable(csv_path, 'Delimiter', ',');
 
-%% functions
-function video_table = sync_all_from_csv(csv_path)
+sync_dir = [job_folder filesep 'oe_sync'];
+[~,~] = mkdir(sync_dir);
 
-video_table = readtable(csv_path);
-% video_table = video_table(~video_table.skip, :);
-
-OE_export = "/home/lapishla/Desktop/pv_videos/katieExport/export/";
-video_events_parent = "/home/lapishla/Desktop/pv_videos/cropped_video/";
-video_table.tracking = cell(height(video_table),1);
 for ind = 1:height(video_table)
-    disp(ind)
-    if video_table.skip(ind)
-        disp("skipping because the CSV told me to")
-        video_table.tracking{ind} = "skipping because the CSV told me to";
-        continue
-    end
+    id = video_table.id{ind};
+    video_path=[job_folder filesep 'videos' filesep id '.mp4'];
 
-    oe_events_path = OE_export + "/" + video_table.oe_export_folder(ind) + "/events.mat";
-    if ~isfile(oe_events_path)
-        warning("no OE event export found")
-        video_table.tracking{ind} = "skipping: no OE event export found";
-        continue
-    end
+    poi_path = [job_folder filesep 'poi' filesep id '_poi.csv'];
+    poi = readtable(poi_path,  'Delimiter', ',', 'ReadRowNames', true);
 
-    id = video_table.ID(ind);
-    video_events_path = video_events_parent + "/" + num2str(id) + "_events.csv";
-    if ~isfile(video_events_path)
-        warning("no video event csv found")
-        video_table.tracking{ind} = "skipping: no video event csv found";
-        continue
-    end
-
-    tracking_parent = "/home/lapishla/Desktop/pv2cap-2-2025-05-28/videos/";
-    model_post_string = "DLC_Resnet50_pv2capMay28shuffle1_snapshot_160.csv";
-    tracking_csv = tracking_parent + num2str(id) + model_post_string;
-    if ~isfile(tracking_csv)
-        warning("no DLC tracking csv found")
-        video_table.tracking{ind} = "skipping: no DLC tracking csv found";
-        continue
-    end
-
-    if strcmp(video_table.Rig{ind}, 'A')
-        left_right_oe_lines = [2, 1];
-        disp("Rig A");
-    elseif strcmp(video_table.Rig{ind}, 'B')
-        left_right_oe_lines = [1, 2];
-        disp("Rig B");
-    end
-
-
-    t = sync_single_experiment(oe_events_path, video_events_path, tracking_csv, left_right_oe_lines);
-
-        % warning("Syncing to OE events failed")
-        % continue
-
-    video_table.tracking{ind} = t;
-
-    %Temporary: For convenience add the corresponding oe export files.
-    %Don't do this long term because file size will be huge.
-    export_dir = OE_export + "/" + video_table.oe_export_folder(ind) ;
-    video_table.oe_events{ind} = load(export_dir + "/events.mat");
-    % video_table.oe_streams{ind} = load(export_dir + "/stream.mat");
-    video_table.oe_spikes{ind} = load(export_dir + "/spikes.mat");
-end
-end
-
-function v_tracking = sync_single_experiment(oe_events_path, video_events_path, tracking_csv, left_right_oe_lines)
-e = load(oe_events_path);
-e = struct2table(e.data);
-v = readtable(video_events_path);
-%%
-e = sortrows(e,"timestamp","ascend");
-v = sortrows(v,"frame","ascend");
-%% Find matching OE events and insert their timestamp
-v.oe_times(:) = nan;
-% Left ON
-v = add_oe_times(v, 1, 'L', e, 0, left_right_oe_lines(1)); 
-% Left OFF
-v = add_oe_times(v, 0, 'L', e, 1, left_right_oe_lines(1));
-% Right ON
-v = add_oe_times(v, 1, 'R', e, 0, left_right_oe_lines(2));
-% Right OFF
-v = add_oe_times(v, 0, 'R', e, 1, left_right_oe_lines(2));
- 
-if ~any(~isnan(v.oe_times)) % If all are nan return empty
-    warning("No events could be synced")
-    v_tracking = "skipping: No events could be synced";
-    return
-else
-    % Interpolate the tracking times based on the OE event times
-    [v_tracking, model_name] = load_tracking_csv(tracking_csv);
-    v_tracking = interp_oe_times(v, v_tracking);
-    return
-end
-end
-
-function tracking = interp_oe_times(events, tracking)
-not_nan = ~isnan(events.oe_times);
-x = events.frame(not_nan);
-v = events.oe_times(not_nan);
-xq = tracking.frame;
-
-[x,~,idx] = unique(x,'stable'); % check for duplicate values of x
-v = accumarray(idx,v,[],@mean); % use mean v for duplicate x values
-
-tracking.oe_times = interp1(x,v,xq, 'linear','extrap');
-end
-
-function [v_tracking, model_name] = load_tracking_csv(filename)
-string_array = readcell(filename);
-
-model_name = string_array(1,2);
-
-bodypart = string(string_array(2, :));
-coords = string(string_array(3, :));
-headers = bodypart + "_" + coords;
-headers(1,1) = "frame";
-
-data = cell2mat(string_array(4:end,:));
-
-v_tracking = array2table(data, 'VariableNames', headers);
-end
-
-function v = add_oe_times(v, state_v, side_v, e, state_e, line_e)
-bool_v = v.state==state_v  &  strcmp(v.side, side_v);
-bool_e = e.state==state_e  &  e.line==line_e;
-
-v_frames = v.frame(bool_v);
-e_times = e.timestamp(bool_e);
-
-pattern_diff = plot_diff_patterns(v_frames, e_times);
-
-len_v = length(v_frames);
-len_e = length(e_times);
-if len_v ~= len_e
-    warning('video has %d events, but ephys has %d events', len_v, len_e)
-    return
-end
-
-max_pattern_error = max(abs(pattern_diff));
-if max_pattern_error > 0.1
-    warning('max pattern difference of %f', max_pattern_error)
-    return
-end
-
-v.oe_times(bool_v) = e_times;
-
-figure(2); clf
-scatter(v_frames, e_times)
-xlabel('video frame')
-ylabel('ephys time (s)')
-end
-
-function pattern_diff = plot_diff_patterns(v_frames, e_times)
-    figure(1); clf; hold on;
-    fps = 15;
-    v_times = v_frames / fps;
-    v_diff = diff(v_times);
-    e_diff = diff(e_times);
+    oe = load([video_table.oe_export_folder{ind} filesep 'events.mat']);
+    oe = struct2table(oe.data);
     
-    plot(v_diff)
-    plot(e_diff)
+    oe_L = oe(oe.line == 2, :);
+    sync_L = sync_side(video_path, poi{{'light_left'},:}, oe_L);
+    oe_R = oe(oe.line == 1, :);
+    sync_R = sync_side(video_path, poi{{'light_right'},:}, oe_R);
+    sync_events = cat(1,sync_R,sync_L);
+    if isempty(sync_events)
+        warning("unable to sync " + video_path)
+        continue
+    end
 
-    ylabel('time since last event (s)')
+    sync_frames = interp_frame_times(sync_events, video_path);
+    sync_file = [sync_dir filesep id '_oe_sync.csv'];
+    writetable(sync_frames, sync_file)
+
+    disp("finished")
+end
+
+function synced = sync_side(video_path, light_xy, oe_events)
+    luminosity = measure_luminosity(video_path, light_xy);
+    light_events = get_light_on_off_times(luminosity);
+
+    % are ON events syncable?
+    f = light_events.frame(light_events.state==1);
+    t = oe_events.timestamp(oe_events.state==0);
+    synced_on = syncable(f,t);
+
+    % are ON events syncable?
+    f = light_events.frame(light_events.state==0);
+    t = oe_events.timestamp(oe_events.state==1);
+    synced_off = syncable(f,t);
+
+    both = [synced_on;synced_off];
+    synced = table();
+    if ~isempty(both)
+        synced.frame = both(:,1);
+        synced.time = both(:,2);
+    end
+end
+function synced = syncable(f,t)
+    if length(f) ~= length(t)
+        synced = [];
+        return
+    end
+    f = sort(f);
+    t = sort(t);
+    norm_rmse = get_diff_error(f, t);
+    if norm_rmse > 0.1
+        synced = [];
+        return
+    end
+
+    synced = [f,t];
+end
+function luminosity = measure_luminosity(video_path, point)
+    disp("measuring luminosity for " + video_path)
+    vidObj = VideoReader(video_path);
+    frame_width = vidObj.Width;
+    frame_height = vidObj.Height;
+    width = 0.03 * frame_width;
+    height = 0.1 * frame_height;
+    x_min = max(floor(point(1) - width/2), 1);
+    x_max = min(floor(point(1) + width/2), frame_width);
+    y_min = max(floor(point(2) - height/2), 1);
+    y_max = min(floor(point(2) + height/2), frame_height);
+
+    luminosity = nan(vidObj.NumFrames, 1);
+    for k = 1:vidObj.NumFrames
+        frame = read(vidObj, k);
+        gray_frame = rgb2gray(frame);
+        luminosity(k) = sum(gray_frame(y_min:y_max, x_min:x_max), 'all');
+
+        % figure(1); clf; hold on;
+        % imshow(gray_frame)
+        % plot([x_min,x_max,x_max,x_min,x_min], [y_max,y_max,y_min,y_min,y_max])
+    end
+end
+function light_events = get_light_on_off_times(signal, threshold, smooth, window_size)
+    if nargin < 2, threshold = 3; end
+    if nargin < 3, smooth = true; end
+    if nargin < 4, window_size = 3; end
+
+    if smooth
+        signal = movmean(signal, window_size);
+    end
+    signal = zscore(signal);
+    threshold = median(signal) + threshold;
+
+    figure(1); clf; hold on;
+    plot(signal)
+    yline(threshold, '--')
+    xlabel('frames')
+    ylabel('luminosity (zscore)')
+
+    above_thresh = signal > threshold;
+    cross_thresh = diff(above_thresh);
+    rising = find(cross_thresh == 1);
+    falling = find(cross_thresh == -1);
+
+    state = [ones(length(rising), 1); zeros(length(falling), 1)];
+    frame = [rising; falling];
+    light_events = table(frame,state);
+end
+function synced = interp_frame_times(sync_events, video_path)
+f = sync_events.frame;
+t = sync_events.time;
+[f,~,idx] = unique(f,'stable'); % check for duplicate frame values
+t = accumarray(idx,t,[],@mean); % use mean t for duplicate frame values
+
+vidObj = VideoReader(video_path);
+frame = 1:vidObj.NumFrames;
+
+time = interp1(f,t,frame, 'linear','extrap');
+synced = table();
+synced.frame = frame';
+synced.time = time';
+end
+
+function norm_rmse = get_diff_error(f, t)
+    % zero shift
+    f = f - f(1);
+    t = t - t(1);
+
+    % convert f to t time
+    f = f * t(end) / f(end);
+
+    % get the signal differences
+    f_diff = diff(f);
+    t_diff = diff(t);
+    
+    figure(1); clf; hold on;
+    plot(f_diff)
+    plot(t_diff)
+
+    ylabel('time since last event')
     xlabel('event number')
     legend('video', 'ephys')
 
-    min_length = min([length(v_diff), length(e_diff)]);
-    pattern_diff = v_diff(1:min_length) - e_diff(1:min_length);
+    rmse = sqrt(mean((f_diff-t_diff).^2));
+    norm_rmse = rmse / mean([f_diff; t_diff]);
 end
+
