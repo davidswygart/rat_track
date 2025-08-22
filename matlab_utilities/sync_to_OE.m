@@ -2,21 +2,18 @@
 % sync file is csv with times frame and oe
 
 job_folder = pwd;
-csv_path = [job_folder filesep 'videos.csv'];
-video_table = readtable(csv_path, 'Delimiter', ',');
+
+video_table = load_video_csv(job_folder);
 
 sync_dir = [job_folder filesep 'oe_sync'];
 [~,~] = mkdir(sync_dir);
-
+s
 for ind = 1:height(video_table)
     id = video_table.id{ind};
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
 
-    poi_path = [job_folder filesep 'poi' filesep id '_poi.csv'];
-    poi = readtable(poi_path,  'Delimiter', ',', 'ReadRowNames', true);
-
-    oe = load([video_table.oe_export_folder{ind} filesep 'events.mat']);
-    oe = struct2table(oe.data);
+    poi = load_poi(job_folder,id);
+    oe = load_oe_events(video_table.oe_export_folder{ind});
     
     oe_L = oe(oe.line == 2, :);
     sync_L = sync_side(video_path, poi{{'light_left'},:}, oe_L);
@@ -134,7 +131,6 @@ synced = table();
 synced.frame = frame';
 synced.time = time';
 end
-
 function norm_rmse = get_diff_error(f, t)
     % zero shift
     f = f - f(1);
