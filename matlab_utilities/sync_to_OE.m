@@ -7,7 +7,7 @@ video_table = load_video_csv(job_folder);
 
 sync_dir = [job_folder filesep 'oe_sync'];
 [~,~] = mkdir(sync_dir);
-s
+
 for ind = 1:height(video_table)
     id = video_table.id{ind};
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
