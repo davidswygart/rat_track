@@ -15,7 +15,7 @@ function tracking = get_all_tracking(job_folder, id)
 
     % load frame to OE time syncing data
     oe_sync = load_oe_video_sync(job_folder,id);
-    tracking.time = oe_sync.time;
+    tracking.time = oe_sync.oe;
 end
 
 function tracking = load_tracking_csv(csv_path, header_lines)
