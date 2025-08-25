@@ -2,57 +2,92 @@
 % sync file is csv with times frame and oe
 
 job_folder = pwd;
-
 video_table = load_video_csv(job_folder);
 
-sync_dir = [job_folder filesep 'oe_sync'];
+sync_dir = [job_folder filesep 'sync_times'];
 [~,~] = mkdir(sync_dir);
 
 for ind = 1:height(video_table)
     id = video_table.id{ind};
-    video_path=[job_folder filesep 'videos' filesep id '.mp4'];
+    fprintf("processing %s \n", id)
 
-    poi = load_poi(job_folder,id);
+    % load oe events
     oe = load_oe_events(video_table.oe_export_folder{ind});
-    
-    oe_L = oe(oe.line == 2, :);
-    sync_L = sync_side(video_path, poi{{'light_left'},:}, oe_L);
-    oe_R = oe(oe.line == 1, :);
-    sync_R = sync_side(video_path, poi{{'light_right'},:}, oe_R);
-    sync_events = cat(1,sync_R,sync_L);
-    if isempty(sync_events)
-        warning("unable to sync " + video_path)
+
+    % load video
+    video_path=[job_folder filesep 'videos' filesep id '.mp4'];
+    vidObj = VideoReader(video_path);
+
+    % get frame mask for left and right lights
+    fprintf("Gettings masks for %s \n", id)
+    poi = load_poi(job_folder,id);
+    masks = cell(2,1);
+    masks{1} = get_mask(vidObj, poi{{'light_left'},:});
+    masks{2} = get_mask(vidObj, poi{{'light_right'},:});
+
+    % measure luminance for left and right lights and get frame times
+    fprintf("Measuring luminosity for %s \n", id)
+    [luminosity, frame_time] = measure_luminosity(vidObj, masks);
+
+    %% left side Syncing
+    [on, off] = get_light_on_off(luminosity(:,1));
+    fprintf("Left side: %i/%i luminance on/off events \n", length(on), length(off))
+
+    % left ON
+    L_on = syncable(frame_time(on), oe.timestamp(oe.line==2 & oe.state==0));
+
+    % left OFF
+    L_off = syncable(frame_time(off), oe.timestamp(oe.line==2 & oe.state==1));
+
+    %% right side Syncing
+    [on, off] = get_light_on_off(luminosity(:,2));
+    fprintf("Right side: %i/%i luminance on/off events \n", length(on), length(off))
+
+    % right on
+    R_on = syncable(frame_time(on), oe.timestamp(oe.line==1 & oe.state==0));
+
+    % right off
+    R_off = syncable(frame_time(off), oe.timestamp(oe.line==1 & oe.state==1));
+
+    %% Interp OE times from all available synced frame times
+    sync_times = cat(1, L_on,L_off,R_on,R_off);
+    fprintf("total syncable times: %i \n", size(sync_times, 1))
+
+    if size(sync_times, 1) < 2
+        warning("unable to sync " + id)
         continue
     end
 
-    sync_frames = interp_frame_times(sync_events, video_path);
-    sync_file = [sync_dir filesep id '_oe_sync.csv'];
-    writetable(sync_frames, sync_file)
+    sync_table = table();
+    sync_table.video = frame_time;
 
-    disp("finished")
+    sync_table.oe = interp_frame_times(sync_times, frame_time);
+
+    sync_file = [sync_dir filesep id '_sync.csv'];
+    fprintf("saving to %s \n", sync_file)
+    writetable(sync_table, sync_file)
 end
 
-function synced = sync_side(video_path, light_xy, oe_events)
-    luminosity = measure_luminosity(video_path, light_xy);
-    light_events = get_light_on_off_times(luminosity);
-
-    % are ON events syncable?
-    f = light_events.frame(light_events.state==1);
-    t = oe_events.timestamp(oe_events.state==0);
-    synced_on = syncable(f,t);
-
-    % are ON events syncable?
-    f = light_events.frame(light_events.state==0);
-    t = oe_events.timestamp(oe_events.state==1);
-    synced_off = syncable(f,t);
-
-    both = [synced_on;synced_off];
-    synced = table();
-    if ~isempty(both)
-        synced.frame = both(:,1);
-        synced.time = both(:,2);
+function mask = get_mask(vidObj, xy, box_scale)
+    if nargin<3
+        box_scale = [0.03, 0.1]; % width and height of bounding box as fraction of image size
     end
+
+    mask = zeros(vidObj.Width, vidObj.Height);
+    mask_sz = size(mask);
+
+    box_size = box_scale .* mask_sz;
+    start = round(xy-box_size/2);
+    stop = round(xy+box_size/2);
+
+    start(start<1) = 1;
+    oversized = stop>mask_sz;
+    stop(oversized)= mask_sz(oversized);
+
+    mask(start(1):stop(1),start(2):stop(2)) = ones(stop-start+1);
+    mask = logical(mask);
 end
+
 function synced = syncable(f,t)
     if length(f) ~= length(t)
         synced = [];
@@ -68,30 +103,24 @@ function synced = syncable(f,t)
 
     synced = [f,t];
 end
-function luminosity = measure_luminosity(video_path, point)
-    disp("measuring luminosity for " + video_path)
-    vidObj = VideoReader(video_path);
-    frame_width = vidObj.Width;
-    frame_height = vidObj.Height;
-    width = 0.03 * frame_width;
-    height = 0.1 * frame_height;
-    x_min = max(floor(point(1) - width/2), 1);
-    x_max = min(floor(point(1) + width/2), frame_width);
-    y_min = max(floor(point(2) - height/2), 1);
-    y_max = min(floor(point(2) + height/2), frame_height);
+function [luminosity, time] = measure_luminosity(vidObj, masks)
+    num_frames = round(vidObj.Duration * vidObj.FrameRate * 1.1); % initial estimate of number of frames + 10% for preallocating arrays
+    luminosity = zeros(num_frames, length(masks));
+    time=zeros(num_frames,1);
 
-    luminosity = nan(vidObj.NumFrames, 1);
-    for k = 1:vidObj.NumFrames
-        frame = read(vidObj, k);
-        gray_frame = rgb2gray(frame);
-        luminosity(k) = sum(gray_frame(y_min:y_max, x_min:x_max), 'all');
-
-        % figure(1); clf; hold on;
-        % imshow(gray_frame)
-        % plot([x_min,x_max,x_max,x_min,x_min], [y_max,y_max,y_min,y_min,y_max])
+    cur_frame = 0;
+    while hasFrame(vidObj)
+        frame = rgb2gray(readFrame(vidObj))';
+        cur_frame = cur_frame+1;
+        for i=1:length(masks)
+            luminosity(cur_frame,i) = sum(frame(masks{i}));
+        end
+        time(cur_frame) = vidObj.CurrentTime;
     end
+    luminosity = luminosity(1:cur_frame,:);
+    time = time(1:cur_frame);
 end
-function light_events = get_light_on_off_times(signal, threshold, smooth, window_size)
+function [rising, falling] = get_light_on_off(signal, threshold, smooth, window_size)
     if nargin < 2, threshold = 3; end
     if nargin < 3, smooth = true; end
     if nargin < 4, window_size = 3; end
@@ -112,25 +141,16 @@ function light_events = get_light_on_off_times(signal, threshold, smooth, window
     cross_thresh = diff(above_thresh);
     rising = find(cross_thresh == 1);
     falling = find(cross_thresh == -1);
-
-    state = [ones(length(rising), 1); zeros(length(falling), 1)];
-    frame = [rising; falling];
-    light_events = table(frame,state);
 end
-function synced = interp_frame_times(sync_events, video_path)
-f = sync_events.frame;
-t = sync_events.time;
-[f,~,idx] = unique(f,'stable'); % check for duplicate frame values
-t = accumarray(idx,t,[],@mean); % use mean t for duplicate frame values
-
-vidObj = VideoReader(video_path);
-frame = 1:vidObj.NumFrames;
-
-time = interp1(f,t,frame, 'linear','extrap');
-synced = table();
-synced.frame = frame';
-synced.time = time';
+function all_e = interp_frame_times(sync_times, all_f)
+    fprintf("Interpolating all %i frames \n", length(all_f))
+    f = sync_times(:,1);
+    e = sync_times(:,2);
+    [f,~,idx] = unique(f,'stable'); % check for duplicate frame times
+    e = accumarray(idx,e,[],@mean); % use mean oe time for duplicate frame times
+    all_e = interp1(f,e,all_f, 'linear','extrap');
 end
+
 function norm_rmse = get_diff_error(f, t)
     % zero shift
     f = f - f(1);
