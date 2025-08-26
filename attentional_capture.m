@@ -56,10 +56,6 @@ for ind=1:height(video_table) % Loop through videos
             sipper = poi{{'sipper_right'}, :};
         end
 
-        % figure(3); clf; hold on;
-        % trial_video(trial,video_path)
-        % play_video(video_path, start, stop)
-
         figure(1); clf; hold on;
         % f= trial.frame(diff(t_time<-1)<0)+2; %last frame of CS+
 
@@ -138,6 +134,10 @@ for ind=1:height(video_table) % Loop through videos
         xline(t_time(interest_ind), '--')
         set(gca, 'Layer','top')
         %pause(1);
+
+        % play video
+        figure(3); clf; hold on;
+        play_video(video_path, trial.time_video(1), trial.time_video(end))
 
         % Save interpolated gaze and distance
         all_gaze(ind, ind_t, :) = interp1(t_time, gaze_diff, common_time, 'linear','extrap');
