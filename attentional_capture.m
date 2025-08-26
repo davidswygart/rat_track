@@ -1,8 +1,16 @@
+clear
 sip_lines = [4,3]; % OE event lines corresponding to L and R sippers
 
 %% set time of interest
 pre_time = 5; %time before sipper (light should start 5s prior)
 post_time = 5; %time after sipper (sipper stays out for 8s)
+t_of_interest = -2.88;
+
+% plot individual blinks?
+light_start = [-5;-4;-3;-2];
+light_stop = light_start+0.25;
+% light_start = -5;
+% light_stop = light_start+4;
 
 %% set colors
 c_light = [252,186,3]/255; % orange
@@ -16,7 +24,12 @@ c_dist = [0,102,204]/255; % cyan
 job_folder = pwd;
 video_table = load_video_csv(job_folder);
 
-for ind=1:1%height(video_table)
+% For getting average gaze and distance
+common_time = -5:1/15:5;
+all_gaze = zeros(height(video_table), 48, length(common_time));
+all_dist = all_gaze;
+
+for ind=1:height(video_table) % Loop through videos
     id = video_table.id{ind};
 
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
@@ -27,15 +40,15 @@ for ind=1:1%height(video_table)
 
     % load tracking (also loads oe time sync)
     tracking = get_all_tracking(job_folder, id);
-    [time, is_L] = get_trial_times(oe_events, sip_lines);
+    [time, is_left] = get_trial_times(oe_events, sip_lines);
 
-    for ind_t = 11:11%length(time)
+    for ind_t = 1:length(time) % Loop through trials
         t=time(ind_t);
-        is_trial = tracking.time>t-pre_time & tracking.time<t+post_time;
+        is_trial = tracking.time_oe>t-pre_time & tracking.time_oe<t+post_time;
         trial = tracking(is_trial,:);
-        t_time = trial.time - t;
+        t_time = trial.time_oe - t;
         
-        if is_L(ind_t)
+        if is_left(ind_t)
             light = poi{{'light_left'},:};
             sipper = poi{{'sipper_left'}, :};
         else
@@ -45,15 +58,11 @@ for ind=1:1%height(video_table)
 
         % figure(3); clf; hold on;
         % trial_video(trial,video_path)
-
-        % light_start = [-5;-4;-3;-2];
-        % light_stop = light_start+0.25;
-        light_start = -5;
-        light_stop = light_start+4;
+        % play_video(video_path, start, stop)
 
         figure(1); clf; hold on;
         % f= trial.frame(diff(t_time<-1)<0)+2; %last frame of CS+
-        t_of_interest = -2.95;
+
         [~, interest_ind] = min(abs(t_time - t_of_interest));
         f= trial.frame(interest_ind); 
         display_frame(video_path, f)
@@ -69,10 +78,10 @@ for ind=1:1%height(video_table)
         % plot_gaze(sip_post, c_sip);
         color = repmat(c_wait, height(trial),1);
         for i=1:length(light_start)
-            is_L = t_time>=light_start(i) & t_time<light_stop(i);
-            color(is_L,:) = repmat(c_light, sum(is_L), 1);
+            is_blinking = t_time>=light_start(i) & t_time<light_stop(i);
+            color(is_blinking,:) = repmat(c_light, sum(is_blinking), 1);
         end
-        
+
         is_S = t_time>=0 & t_time<8;
         color(is_S,:) = repmat(c_sip, sum(is_S), 1);
         plot_gaze(trial, color);
@@ -86,7 +95,7 @@ for ind=1:1%height(video_table)
         y=[375,375];
         plot(x,y, 'k', LineWidth=3)
         text(mean(x),y(1),'75 mm',FontWeight='bold',HorizontalAlignment='center',VerticalAlignment='bottom')
-        % title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
+        title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
         axis off
 
         gaze_angle = calc_gaze_angle(trial);
@@ -125,23 +134,55 @@ for ind=1:1%height(video_table)
         ax = gca;
         ax.YAxis(1).Color = c_gaze;
         ax.YAxis(2).Color = c_dist;
-        % title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
+        title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
         xline(t_time(interest_ind), '--')
         set(gca, 'Layer','top')
-        pause(1);
+        %pause(1);
+
+        % Save interpolated gaze and distance
+        all_gaze(ind, ind_t, :) = interp1(t_time, gaze_diff, common_time, 'linear','extrap');
+        all_dist(ind, ind_t, :) = interp1(t_time, sip_dist_mm, common_time, 'linear','extrap');
     end
 end
 
 
 
 
+%% plot all gaze
+
+all_gaze_unrap = squeeze(reshape(all_gaze, [],1,size(all_gaze,3)));
+all_dist_unrap = squeeze(reshape(all_dist, [],1,size(all_dist,3)));
+
+figure(4); clf; hold on
+
+shadedErrorBar(common_time,all_gaze_unrap,{@mean,@sem},'lineProps',{'Color', c_gaze});
+ylim([0 180])
+yline(90, '--', Color=c_gaze)
+ylabel("Gaze offset from CS+ (°)")
+
+yyaxis right
+shadedErrorBar(common_time,all_dist_unrap,{@mean,@sem},'lineProps',{'Color', c_dist});
+ylim([0 420])
+yline(210, '--', Color=c_dist)
+ylabel("Distance to sipper (mm)")
+
+xline(-1, Color=c_light)
+xline(0, Color=c_sip)
+xlabel("time before sipper (s)")
+
+ax = gca;
+ax.YAxis(1).Color = c_gaze;
+ax.YAxis(2).Color = c_dist;
+
+%% zoom in on y differences
+
+yyaxis left; ylim([90-20, 90+20])
+yyaxis right; ylim([210-40, 210+40])
 
 
-
-
-
-
-
+function err = sem(x)
+    err = std(x) / sqrt(size(x,1));
+end
 
 
 

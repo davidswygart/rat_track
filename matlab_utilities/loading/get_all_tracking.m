@@ -15,7 +15,9 @@ function tracking = get_all_tracking(job_folder, id)
 
     % load frame to OE time syncing data
     oe_sync = load_oe_video_sync(job_folder,id);
-    tracking.time = oe_sync.oe;
+    %rename column names for clarity when concatonated to tracking info
+    oe_sync.Properties.VariableNames = "time_" + oe_sync.Properties.VariableNames;
+    tracking = cat(2, oe_sync, tracking);
 end
 
 function tracking = load_tracking_csv(csv_path, header_lines)
