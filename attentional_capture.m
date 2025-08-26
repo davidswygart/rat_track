@@ -29,7 +29,7 @@ common_time = -5:1/15:5;
 all_gaze = zeros(height(video_table), 48, length(common_time));
 all_dist = all_gaze;
 
-for ind=19:height(video_table) %1:height(video_table) % Loop through videos
+for ind=1:height(video_table) % Loop through videos
     id = video_table.id{ind};
 
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
@@ -42,7 +42,7 @@ for ind=19:height(video_table) %1:height(video_table) % Loop through videos
     tracking = get_all_tracking(job_folder, id);
     [time, is_left] = get_trial_times(oe_events, sip_lines);
 
-    for ind_t = 9:length(time)%1:length(time) % Loop through trials
+    for ind_t = 1:length(time) % Loop through trials
         t=time(ind_t);
         is_trial = tracking.time_oe>t-pre_time & tracking.time_oe<t+post_time;
         trial = tracking(is_trial,:);
@@ -91,7 +91,7 @@ for ind=19:height(video_table) %1:height(video_table) % Loop through videos
         y=[375,375];
         plot(x,y, 'k', LineWidth=3, Color=[1,1,1])
         text(mean(x),y(1),'75 mm',FontWeight='bold',HorizontalAlignment='center',VerticalAlignment='bottom', Color=[1,1,1])
-        % title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
+        title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
         axis off
 
         gaze_angle = calc_gaze_angle(trial);
@@ -133,7 +133,7 @@ for ind=19:height(video_table) %1:height(video_table) % Loop through videos
         ax.YAxis(1).FontWeight= 'bold';
         ax.YAxis(2).FontWeight= 'bold';
         ax.XAxis.FontWeight= 'bold';
-        % title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
+        title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
         xline(t_time(interest_ind), '--')
         set(gca, 'Layer','top')
         %pause(1);
