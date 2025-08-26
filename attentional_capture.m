@@ -2,15 +2,15 @@ clear
 sip_lines = [4,3]; % OE event lines corresponding to L and R sippers
 
 %% set time of interest
-pre_time = 5; %time before sipper (light should start 5s prior)
+pre_time = 6; %time before sipper (light should start 5s prior)
 post_time = 5; %time after sipper (sipper stays out for 8s)
 t_of_interest = -2.88;
 
 % plot individual blinks?
-light_start = [-5;-4;-3;-2];
-light_stop = light_start+0.25;
-% light_start = -5;
-% light_stop = light_start+4;
+% light_start = [-5;-4;-3;-2];
+% light_stop = light_start+0.25;
+light_start = -5;
+light_stop = light_start+4;
 
 %% set colors
 c_light = [252,186,3]/255; % orange
@@ -29,7 +29,7 @@ common_time = -5:1/15:5;
 all_gaze = zeros(height(video_table), 48, length(common_time));
 all_dist = all_gaze;
 
-for ind=1:height(video_table) % Loop through videos
+for ind=19:height(video_table) %1:height(video_table) % Loop through videos
     id = video_table.id{ind};
 
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
@@ -42,7 +42,7 @@ for ind=1:height(video_table) % Loop through videos
     tracking = get_all_tracking(job_folder, id);
     [time, is_left] = get_trial_times(oe_events, sip_lines);
 
-    for ind_t = 1:length(time) % Loop through trials
+    for ind_t = 9:length(time)%1:length(time) % Loop through trials
         t=time(ind_t);
         is_trial = tracking.time_oe>t-pre_time & tracking.time_oe<t+post_time;
         trial = tracking(is_trial,:);
@@ -86,12 +86,12 @@ for ind=1:height(video_table) % Loop through videos
         daspect([1 1 1])
         %scale bar
         bar_length = 75;
-        x=400;
+        x=270;
         x = [x, x+bar_length/scale_factor(poi)];
         y=[375,375];
-        plot(x,y, 'k', LineWidth=3)
-        text(mean(x),y(1),'75 mm',FontWeight='bold',HorizontalAlignment='center',VerticalAlignment='bottom')
-        title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
+        plot(x,y, 'k', LineWidth=3, Color=[1,1,1])
+        text(mean(x),y(1),'75 mm',FontWeight='bold',HorizontalAlignment='center',VerticalAlignment='bottom', Color=[1,1,1])
+        % title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
         axis off
 
         gaze_angle = calc_gaze_angle(trial);
@@ -109,28 +109,31 @@ for ind=1:height(video_table) % Loop through videos
         for i=1:length(light_start)
             width = light_stop(i) - light_start(i);
             rectangle(Position=[light_start(i),0,width,180], FaceColor=c_light, EdgeColor=c_light)
-            text(light_start(i)+width/2, 178, 'CS+', HorizontalAlignment='center', VerticalAlignment='top')
+            % text(light_start(i)+width/2, 178, 'CS+', HorizontalAlignment='center', VerticalAlignment='top')
         end
          % wait rectangle
         rectangle(Position=[-1,0,1,180], FaceColor=c_wait, EdgeColor=c_wait)
         % sipper rectangle and text
         rectangle(Position=[0,0,8,180], FaceColor=c_sip, EdgeColor=c_sip)
-        text(post_time/2 , 178, 'sipper', HorizontalAlignment='center', VerticalAlignment='top')
+        % text(post_time/2 , 178, 'sipper', HorizontalAlignment='center', VerticalAlignment='top')
         % plot gaze_diff
         plot(t_time, gaze_diff, LineWidth=3, Color=c_gaze)
-        ylabel("Gaze offset from CS+ (°)")
+        ylabel("Gaze offset from CS+ (°)", 'FontWeight', 'bold')
         ylim([0,180])
         % plot distance from sipper
         yyaxis right
         plot(t_time, sip_dist_mm, LineWidth=3, Color=c_dist)
-        ylabel("Distance to sipper (mm)")
+        ylabel("Distance to sipper (mm)", 'FontWeight', 'bold')
         ylim([0 420])
         xlim([-pre_time,post_time])
-        xlabel("time before sipper (s)")
+        xlabel("time before sipper (s)", 'FontWeight', 'bold')
         ax = gca;
         ax.YAxis(1).Color = c_gaze;
         ax.YAxis(2).Color = c_dist;
-        title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
+        ax.YAxis(1).FontWeight= 'bold';
+        ax.YAxis(2).FontWeight= 'bold';
+        ax.XAxis.FontWeight= 'bold';
+        % title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
         xline(t_time(interest_ind), '--')
         set(gca, 'Layer','top')
         %pause(1);
