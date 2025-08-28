@@ -1,6 +1,15 @@
-function play_video(path, start, stop)
-    vidObj = VideoReader(path);
-    frame_dur = 1 / vidObj.FrameRate;
+function play_video(video, start, stop, speedup) 
+    % video should be a VideoReader object or a path to a video
+    if nargin<4
+        speedup=1;
+    end
+
+    if isa(video, 'VideoReader')
+        vidObj = video;
+    else
+        vidObj = VideoReader(video);
+    end
+    frame_dur = 1 / vidObj.FrameRate / speedup;
 
     hAxes = axes;
     hImg = imshow(zeros(vidObj.Height, vidObj.Width, 3), 'Parent', hAxes);
