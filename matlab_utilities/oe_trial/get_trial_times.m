@@ -15,4 +15,5 @@ function [time, is_L] = get_trial_times(oe_events, sip_lines)
     % sort by time
     [time, sort_ind] = sort(time);
     is_L = is_L(sort_ind);
+    is_L = logical(is_L);
 end
