@@ -7,12 +7,8 @@ speedup = 1.5;
 
 job_folder = pwd;
 video_table = load_video_csv(job_folder);
-
-
-
-for ind_v=2:height(video_table)
+for ind_v=1:height(video_table)
     id = video_table.id{ind_v};
-
     oe_events = load_oe_events(video_table.oe_export_folder{ind_v});
     [sipper_times, is_L] = get_trial_times(oe_events, sip_lines);
     side_str = strings(size(sipper_times));
@@ -23,7 +19,6 @@ for ind_v=2:height(video_table)
 
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
     vidObj = VideoReader(video_path);
-
     
     [did_drink, curation_file] = load_curation(job_folder,id);
     if isempty(did_drink)
@@ -43,11 +38,8 @@ for ind_v=2:height(video_table)
 
         figure(1); clf;
         title(sprintf('id %s ; trial %i ; side %s \n', strrep(id, '_', '\_'),ind_t,side_str(ind_t)))
-        
         while true
             play_video(vidObj, start_video, stop_video, speedup)
-
-
             input_msg = "\n ..." + ...
                         "Enter: 'd' (drink) or 'f' (fail to drink) \n" + ...
                         "or: 's' (speed up) or 'a' (ahhh... slow down) \n" + ...
