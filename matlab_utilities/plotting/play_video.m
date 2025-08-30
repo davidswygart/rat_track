@@ -11,10 +11,14 @@ function keypress = play_video(video, start, stop, speedup)
     end
     frame_dur = 1 / vidObj.FrameRate / speedup;
 
+    %% set callback function on keypress
+    keypress = '';
+    function keyPressCallback(~, event)
+        keypress =  event.Key;
+    end
     set(gcf, 'WindowKeyPressFcn', @keyPressCallback);
-
-    hAxes = axes;
-    hImg = imshow(zeros(vidObj.Height, vidObj.Width, 3), 'Parent', hAxes);
+    %%
+    hImg = imshow(zeros(vidObj.Height, vidObj.Width, 3), 'Parent', axes);
     vidObj.CurrentTime = start; 
     while hasFrame(vidObj) && vidObj.CurrentTime < stop
         frame = readFrame(vidObj);
@@ -22,17 +26,8 @@ function keypress = play_video(video, start, stop, speedup)
         drawnow;
         pause(frame_dur);
 
-        k = get(gcf, 'UserData');
-        if ~isempty(k)
-            keypress = k;
-            set(gcf, 'UserData', '')
+        if ~isempty(keypress)
             return
         end
     end
-    keypress = '';
-    cla('reset')
-end
-
-function keyPressCallback(src, event)
-    set(src, 'UserData', event.Key)
 end
