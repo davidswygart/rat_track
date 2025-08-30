@@ -7,6 +7,7 @@ speedup = 1.5;
 
 job_folder = pwd;
 video_table = load_video_csv(job_folder);
+name = input( "Please enter your name:", 's');
 for ind_v=1:height(video_table)
     id = video_table.id{ind_v};
     oe_events = load_oe_events(video_table.oe_export_folder{ind_v});
@@ -19,14 +20,14 @@ for ind_v=1:height(video_table)
 
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
     vidObj = VideoReader(video_path);
-    
-    [did_drink, curation_file] = load_curation(job_folder,id);
-    if isempty(did_drink)
-        did_drink = nan(size(sipper_times));
+
+    [curation, curation_file] = load_curation(job_folder,id);
+    if isempty(curation)
+        curation = table(nan(size(sipper_times)), strings(size(sipper_times)), 'VariableNames', {'drank', 'curator'});
     end
 
     for ind_t = 1:length(sipper_times)
-        if ~isnan(did_drink(ind_t))
+        if ~isnan(curation.drank(ind_t))
             fprintf("\n trial #%i already curated \n", ind_t)
             continue
         end
@@ -46,10 +47,12 @@ for ind_v=1:height(video_table)
                         "or: just hit enter to replay the video: \n";
             user_input = input(input_msg, 's'); % Read input as string
             if strcmp(user_input, 'd')
-                did_drink(ind_t) = 1;
+                curation.drank(ind_t) = 1;
+                curation.curator(ind_t)=name;
                 break;
             elseif strcmp(user_input, 'f')
-                did_drink(ind_t) = 0;
+                curation.drank(ind_t) = 0;
+                curation.curator(ind_t)=name;
                 break;
             elseif strcmp(user_input, 's')
                 speedup = speedup*1.5;
@@ -59,7 +62,7 @@ for ind_v=1:height(video_table)
                 fprintf("new speed = %f", speedup)
             end
         end
-        writematrix(did_drink, curation_file);
+        writetable(curation, curation_file);
     end
 end
 disp("YOU ARE DONE!!!!")
@@ -68,6 +71,4 @@ function t_video = oe2video_time(oe, sync)
     [~, ind] = min(abs(oe-sync.oe));
     t_video = sync.video(ind);
 end
-
-
 

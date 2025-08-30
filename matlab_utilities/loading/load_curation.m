@@ -4,7 +4,7 @@ function [did_drink, path] = load_curation(job_folder, id)
 
     path = [curation_folder, id, '.csv'];
     if exist(path,"file")
-        did_drink = readmatrix(path);
+        did_drink = readtable(path, 'Delimiter', ',');
     else
         [~,~] = mkdir(curation_folder);
         did_drink = [];
