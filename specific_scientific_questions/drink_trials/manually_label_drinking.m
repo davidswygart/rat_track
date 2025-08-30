@@ -37,29 +37,26 @@ for ind_v=1:height(video_table)
         start_video = oe2video_time(start_oe, sync);
         stop_video = oe2video_time(stop_oe, sync);
 
-        figure(1); clf;
-        title(sprintf('id %s ; trial %i ; side %s \n', strrep(id, '_', '\_'),ind_t,side_str(ind_t)))
         while true
-            play_video(vidObj, start_video, stop_video, speedup)
-            input_msg = "\n ..." + ...
-                        "Enter: 'd' (drink) or 'f' (fail to drink) \n" + ...
-                        "or: 's' (speed up) or 'a' (ahhh... slow down) \n" + ...
-                        "or: just hit enter to replay the video: \n";
-            user_input = input(input_msg, 's'); % Read input as string
-            if strcmp(user_input, 'd')
-                curation.drank(ind_t) = 1;
-                curation.curator(ind_t)=name;
-                break;
-            elseif strcmp(user_input, 'f')
-                curation.drank(ind_t) = 0;
-                curation.curator(ind_t)=name;
-                break;
-            elseif strcmp(user_input, 's')
-                speedup = speedup*1.5;
-                fprintf("new speed = %f", speedup)
-            elseif strcmp(user_input, 'a')
-                speedup = speedup/1.5;
-                fprintf("new speed = %f", speedup)
+            fig = figure(1); clf;
+            title(sprintf('id %s ; trial %i ; side %s \n', strrep(id, '_', '\_'),ind_t,side_str(ind_t)))
+            xlabel({'d=drank ; f=failed to drink ', 's=speed up ; a=ahhh! too fast'})
+            keypress = play_video(vidObj, start_video, stop_video, speedup);
+            switch keypress
+                case 'd'
+                    curation.drank(ind_t) = 1;
+                    curation.curator{ind_t}=name;
+                    break;
+                case 'f'
+                    curation.drank(ind_t) = 0;
+                    curation.curator{ind_t}=name;
+                    break;
+                case 's'
+                    speedup = speedup*1.5;
+                    fprintf("new speed = %f\n", speedup)
+                case 'a'
+                    speedup = speedup/1.5;
+                    fprintf("new speed = %f\n", speedup)
             end
         end
         writetable(curation, curation_file);
