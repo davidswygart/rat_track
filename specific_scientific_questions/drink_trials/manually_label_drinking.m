@@ -46,10 +46,12 @@ for ind_v=1:height(video_table)
                 case 'd'
                     curation.drank(ind_t) = 1;
                     curation.curator{ind_t}=name;
+                    disp('labeled drink')
                     break;
                 case 'f'
                     curation.drank(ind_t) = 0;
                     curation.curator{ind_t}=name;
+                    disp('labeled No-drink')
                     break;
                 case 's'
                     speedup = speedup*1.5;
