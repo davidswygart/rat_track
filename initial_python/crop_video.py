@@ -17,7 +17,7 @@ def main(job_folder):
 
     crop_settings = load_settings(job_folder)['crop']
     all_commands = []
-    point_names = ["upper left", "lower right"]
+    point_names = ["light left", "light right"]
     for r in video_info.itertuples():
         try:
             # interactively choose cropping points
