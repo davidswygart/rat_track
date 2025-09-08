@@ -9,69 +9,77 @@ from collections import namedtuple
 def main(job_folder):
     # generate IDs for videos
     video_info = get_video_info(job_folder)
-    video_info['id'] = generate_unique_names(len(video_info))
-
+    vi_temp = video_info.copy() # create a copy of the csv table where we can save temporary variables
+    vi_temp['id'] = generate_unique_names(len(vi_temp))
     export_dir = os.path.join(job_folder, 'videos')
     os.makedirs(export_dir, exist_ok=True)
-    video_info['cropped_path'] =  [os.path.join(export_dir,id+'.mp4') for id in video_info.id]
+    vi_temp['cropped_path'] =  [os.path.join(export_dir,id+'.mp4') for id in vi_temp.id]
 
     crop_settings = load_settings(job_folder)['crop']
-    all_commands = []
+    
+    # interactively choose cropping points for each video
     point_names = ["light left", "light right"]
-    for r in video_info.itertuples():
-        try:
-            # interactively choose cropping points
-            points = select_points(r.video_path, point_names)
+    vi_temp['points'] = None 
+    for r in vi_temp.itertuples():
+            p = select_points(r.video_path, point_names)
+            if p:
+                vi_temp.at[r.Index, 'points'] = p
+            else:
+                print(f"error choosing points for {r.video_path}")
 
-            # cropping string
-            c = calc_crop_coordinates(points, crop_settings)
-            crop = f"crop={c.width}:{c.height}:{c.x_start}:{c.y_start}"
+    # Create cropping process for each video
+    vi_temp['process'] = None  
+    for r in vi_temp.itertuples():
+        if not r.points:
+            continue
+        # cropping string
+        c = calc_crop_coordinates(r.points, crop_settings)
+        crop = f"crop={c.width}:{c.height}:{c.x_start}:{c.y_start}"
 
-            # scaling string
-            sz = crop_settings['cropped_size']
-            scale = f"scale={sz[0]}:{sz[1]}"
+        # scaling string
+        sz = crop_settings['cropped_size']
+        scale = f"scale={sz[0]}:{sz[1]}"
 
-            # filter chain string
-            filter_chain = f"{crop},{scale}"
-            if (r.flip_xy):
-                filter_chain = filter_chain + ",hflip,vflip"
-            
-            # Full FFmpeg command
-            ffmpeg_cmd = [
-                "ffmpeg",
-                "-y", #automatically overwrite
-                "-i", r.video_path,
-                "-vf", filter_chain,
-                "-c:a", "copy",
-                "-an",
-                r.cropped_path
-            ]
-            all_commands.append(ffmpeg_cmd)
-        except:
-            print(f"error with {r.video_path}")
-    
-    with open("ffmpeg_commands.txt", "w") as file:
-        for item in all_commands:
-            file.write(str(item) + "\n")
-    
-    processes = []
-    for c in all_commands:
-        # subprocess.run(c, check=True)
-        print(f"Successfully processed: {r.cropped_path}")
-        p = subprocess.Popen(c, stdout=subprocess.PIPE, stderr=subprocess.PIPE, text=True)
-        processes.append(p)
+        # filter chain string
+        filter_chain = f"{crop},{scale}"
+        if (r.flip_xy):
+            filter_chain = filter_chain + ",hflip,vflip"
+        
+        # Full FFmpeg command
+        ffmpeg_cmd = [
+            "ffmpeg",
+            "-y", #automatically overwrite
+            "-i", r.video_path,
+            "-vf", filter_chain,
+            "-c:a", "copy",
+            "-an",
+            r.cropped_path
+        ]
+
+        p = subprocess.Popen(ffmpeg_cmd, stderr=subprocess.PIPE, text=True)
+        vi_temp.at[r.Index, 'process'] = p
+
+
+
     print("All subprocesses launched.")
 
     # Wait for all processes to complete and collect their output
-    for i, proc in enumerate(processes):
-        stdout, stderr = proc.communicate()
-        print(f"Output from Task {i+1}:\n{stdout.strip()}")
-        if stderr:
-            print(f"Error from Task {i+1}:\n{stderr.strip()}")
+    vi_temp['crop_success'] = False 
+    for r in vi_temp.itertuples():
+        if r.process:
+            stderr_output, _ = r.process.communicate() # wait for process
+            if r.process.returncode == 0:
+                print(f"crop success for {r.id}")
+                vi_temp.at[r.Index, 'crop_success'] = True       
+            else:
+                print(f"ffmpeg Error for {r.id}:\n{stderr_output.strip()}")
+
     print("All subprocesses completed.")
 
+    # Overwrite csv with ID and success flag
+    video_info['id'] = vi_temp['id'] 
+    video_info['crop_success'] = vi_temp['crop_success']
     overwrite_video_info(job_folder, video_info)
-
 
 def calc_crop_coordinates(points, crop_settings):
     points = np.array(points)
