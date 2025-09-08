@@ -32,13 +32,11 @@ def overwrite_video_info(job_folder, video_info):
 def select_points(video_path, point_names):
     ret, frame = cv2.VideoCapture(video_path).read()  
     if not ret:
+        print(f"Error loading video: {video_path}")
         return None
     f = frame.copy() # save original frame in case the user needs to restart
     
     points = []
-    if not point_names:
-        return points
-
     def prompt_next_click():
         if len(points) < len(point_names):
             print(f"Click {point_names[len(points)]}, or type 'r' to restart selection")
