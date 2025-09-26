@@ -12,7 +12,12 @@ for ind = 1:height(video_table)
     fprintf("processing %s \n", id)
 
     % load oe events
-    oe = load_oe_events(video_table.oe_export_folder{ind});
+    try
+        oe = load_oe_events(video_table.oe_export_folder{ind});
+    catch
+        warning("error loading OE events for %s: skipping",  video_table.id{ind})
+        continue
+    end
 
     % load video
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
@@ -34,20 +39,20 @@ for ind = 1:height(video_table)
     fprintf("Left side: %i/%i luminance on/off events \n", length(on), length(off))
 
     % left ON
-    L_on = syncable(frame_time(on), oe.timestamp(oe.line==2 & oe.state==0));
+    [L_on, msg, err]  = syncable(frame_time(on), oe.timestamp(oe.line==2 & oe.state==0));
 
     % left OFF
-    L_off = syncable(frame_time(off), oe.timestamp(oe.line==2 & oe.state==1));
+    [L_off, msg, err]  = syncable(frame_time(off), oe.timestamp(oe.line==2 & oe.state==1));
 
     %% right side Syncing
     [on, off] = get_light_on_off(luminosity(:,2));
     fprintf("Right side: %i/%i luminance on/off events \n", length(on), length(off))
 
     % right on
-    R_on = syncable(frame_time(on), oe.timestamp(oe.line==1 & oe.state==0));
+    [R_on, msg, err]  = syncable(frame_time(on), oe.timestamp(oe.line==1 & oe.state==0));
 
     % right off
-    R_off = syncable(frame_time(off), oe.timestamp(oe.line==1 & oe.state==1));
+    [R_off, msg, err]  = syncable(frame_time(off), oe.timestamp(oe.line==1 & oe.state==1));
 
     %% Interp OE times from all available synced frame times
     sync_times = cat(1, L_on,L_off,R_on,R_off);
@@ -88,20 +93,76 @@ function mask = get_mask(vidObj, xy, box_scale)
     mask = logical(mask);
 end
 
-function synced = syncable(f,t)
-    if length(f) ~= length(t)
-        synced = [];
-        return
-    end
+function [synced, completion_msg, rmse]= syncable(f,t)
     f = sort(f);
     t = sort(t);
-    norm_rmse = get_diff_error(f, t);
-    if norm_rmse > 0.1
+
+    if isempty(f)
+        completion_msg = sprintf("No frametimes to sync");
         synced = [];
+        rmse = inf;
         return
     end
 
-    synced = [f,t];
+    error_threshold = 0.1;
+    if length(f) == length(t)
+        norm_rmse = get_diff_error(f, t);
+        if norm_rmse < error_threshold
+            synced = [f,t];
+            completion_msg = sprintf("Completed successfully");
+            rmse = norm_rmse;
+            return
+        else
+            completion_msg = sprintf("Normalized RMSE of" + ...
+                " time differentials (%d) above" + ...
+                " error threshold (%d)",norm_rmse, error_threshold);
+            synced = [];
+            rmse = norm_rmse;
+            return
+        end
+    else
+        % figure out which is shorter; OE or video
+        [min_length, shorter_ind] = min([length(t), length(f)]);
+        rec_type = ["OE", "video"];
+        shorter_type = rec_type(shorter_ind);
+        
+        % try trimming off the end of the longer recording
+        trim_t_end = t(1:min_length);
+        trim_f_end = f(1:min_length);
+        norm_rmse_trim_end = get_diff_error(trim_t_end, trim_f_end);
+
+        % try trimming off the start of the longer recording
+        trim_t_start = t(end-min_length+1:end);
+        trim_f_start = f(end-min_length+1:end);
+        norm_rmse_trim_start = get_diff_error(trim_t_start, trim_f_start);
+
+        % pick the trimming strategy that yeilded the lowest error
+        [min_rmse, best_ind] = min([norm_rmse_trim_end, norm_rmse_trim_start]);
+        strategies = ["trimming end", "trimming start"];
+        best_strategy = strategies(best_ind);
+        both_synced = {[trim_f_end,trim_t_end], [trim_f_start,trim_t_start]};
+        best_synced = both_synced{best_ind};
+
+        % check if the best strategy yeilded acceptably low error
+        if min_rmse < error_threshold
+            completion_msg = sprintf("Hacky success. %s had fewer events than expected." + ...
+                " %s of longer recording resulted in acceptable rmse (%d)", ...
+                shorter_type, best_strategy, min_rmse);
+            synced = best_synced;
+            rmse = min_rmse;
+            return
+        else
+            completion_msg = sprintf("Failure. %s had fewer events than expected." + ...
+                " %s of longer recording still resulted in unacceptable rmse (%d)", ...
+                shorter_type, best_strategy, min_rmse);
+            synced = [];
+            rmse = min_rmse;
+            return
+        end
+    end
+
+
+
 end
 function [luminosity, time] = measure_luminosity(vidObj, masks)
     num_frames = round(vidObj.Duration * vidObj.FrameRate * 1.1); % initial estimate of number of frames + 10% for preallocating arrays
@@ -153,11 +214,11 @@ end
 
 function norm_rmse = get_diff_error(f, t)
     % zero shift
-    f = f - f(1);
-    t = t - t(1);
+    % f = f - f(1); % not needed if using real seconds
+    % t = t - t(1); % not needed if using real seconds
 
     % convert f to t time
-    f = f * t(end) / f(end);
+    % f = f * t(end) / f(end); % not needed if using real seconds
 
     % get the signal differences
     f_diff = diff(f);
