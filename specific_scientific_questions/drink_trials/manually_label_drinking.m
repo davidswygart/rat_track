@@ -10,6 +10,7 @@ video_table = load_video_csv(job_folder);
 name = input( "Please enter your name:", 's');
 welcome_message(name)
 for ind_v=1:height(video_table)
+    try
     id = video_table.id{ind_v};
     oe_events = load_oe_events(video_table.oe_export_folder{ind_v});
     [sipper_times, is_L] = get_trial_times(oe_events, sip_lines);
@@ -27,11 +28,15 @@ for ind_v=1:height(video_table)
         curation = table(nan(size(sipper_times)), strings(size(sipper_times)), 'VariableNames', {'drank', 'curator'});
     end
 
-    for ind_t = 1:length(sipper_times)
-        if ~isnan(curation.drank(ind_t))
+    ind_t = 0;
+    skip_nan=true; 
+    while ind_t<length(sipper_times)
+        ind_t = ind_t + 1;
+        if skip_nan & ~isnan(curation.drank(ind_t))
             fprintf("\n trial #%i already curated \n", ind_t)
             continue
         end
+        skip_nan=true;
         start_oe = sipper_times(ind_t)-pre_time;
         stop_oe = sipper_times(ind_t)+post_time;
 
@@ -41,7 +46,7 @@ for ind_v=1:height(video_table)
         while true
             fig = figure(1); clf;
             title(sprintf('id %s ; trial %i ; side %s \n', strrep(id, '_', '\_'),ind_t,side_str(ind_t)))
-            xlabel({'d=drank ; f=failed to drink ', 's=speed up ; a=ahhh! too fast'})
+            xlabel({'d=drank ; f=failed to drink ', 's=speed up ; a=ahhh! too fast', 'b=go back 1 trial : n=skip to next trial'})
             keypress = play_video(vidObj, start_video, stop_video, speedup);
             switch keypress
                 case 'd'
@@ -60,9 +65,25 @@ for ind_v=1:height(video_table)
                 case 'a'
                     speedup = speedup/1.5;
                     fprintf("new speed = %f\n", speedup)
+                case 'b'
+                    if ind_t > 1
+                        ind_t = ind_t - 2;
+                        skip_nan=false; 
+                        disp("going back 1 trial")
+                        break;
+                    else 
+                       disp("Can't go back, already on first trial")
+                    end
+                case 'n'
+                    disp("skipping to next trial")
+                    break;
+
             end
         end
         writetable(curation, curation_file);
+    end
+    catch
+        warning("problem with %s: skipping", video_table.id{ind_v})
     end
 end
 disp("YOU ARE DONE!!!!")
