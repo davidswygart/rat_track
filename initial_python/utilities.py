@@ -60,7 +60,7 @@ def select_points(video_path, point_names):
         key = cv2.waitKey(0)
         if key == ord('r'):
             cv2.destroyAllWindows()
-            return select_points(frame, point_names)
+            return select_points(video_path, point_names)
         elif key == 32:  # SPACE key to confirm and exit
             if len(points) < len(point_names):
                 print("Not enough points selected. Please select all points.")
