@@ -1,26 +1,26 @@
-%% load matching curated files
-maria_folder = "manually_curated_maria";
+%% find matching curated files
+main_folder = "manually_curated";
 madison_folder = "manually_curated_madison";
 
-maria_files = get_filenames(maria_folder);
+main_files = get_filenames(main_folder);
 madison_files = get_filenames(madison_folder);
-common_files = intersect(maria_files, madison_files);
+common_files = intersect(main_files, madison_files);
 
-matches = nan(length(common_files),1);
-total = matches;
+%% load data into single table
+main = table();
+madison = table();
 for ind=1:length(common_files)
-    maria = readmatrix(maria_folder + filesep + common_files(ind));
-    madison = readmatrix(madison_folder + filesep + common_files(ind));
-
-    is_match = maria == madison;
-    not_nan = ~isnan(maria) & ~isnan(madison);
-    
-    matches(ind) = sum(is_match & not_nan);
-    total(ind) = sum(not_nan);
-    fprintf(" \n %d of %d matching for %s", matches(ind),total(ind),common_files(ind))
+    main = cat(1, main, readtable(maria_folder + filesep + common_files(ind)));
+    madison = cat(1, madison, readtable(madison_folder + filesep + common_files(ind)));
 end
-fprintf(" \n %.2f total consistency, N=%d", sum(matches) / sum(total), sum(total))
-
+%% Determine consistency
+disp("Consistency to absolute ground truth knowledge (Madison)")
+names = unique(main.curator);
+for i=1:length(names)
+    is_t = strcmp(main.curator, names(i));
+    match = main.drank(is_t) == madison.drank(is_t);
+    fprintf(" \n%s: %.2f consistency, N=%d",names{i}, sum(match) / sum(is_t), sum(is_t))
+end
 %% functions
 function filenames = get_filenames(folder)
     files = dir(folder + filesep + "*csv");
