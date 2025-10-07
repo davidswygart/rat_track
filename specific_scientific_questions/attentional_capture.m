@@ -3,7 +3,7 @@ sip_lines = [4,3]; % OE event lines corresponding to L and R sippers
 
 %% set time of interest
 pre_time = 6; %time before sipper (light should start 5s prior)
-post_time = 5; %time after sipper (sipper stays out for 8s)
+post_time = 9; %time after sipper (sipper stays out for 8s)
 t_of_interest = -2.88;
 
 % plot individual blinks?
@@ -31,6 +31,8 @@ all_dist = all_gaze;
 
 for ind=1:height(video_table) % Loop through videos
     id = video_table.id{ind};
+    fig_dir = "fig_attention/"+id;
+    mkdir(fig_dir)
 
     video_path=[job_folder filesep 'videos' filesep id '.mp4'];
 
@@ -43,6 +45,7 @@ for ind=1:height(video_table) % Loop through videos
     [time, is_left] = get_trial_times(oe_events, sip_lines);
 
     for ind_t = 1:length(time) % Loop through trials
+        
         t=time(ind_t);
         is_trial = tracking.time_oe>t-pre_time & tracking.time_oe<t+post_time;
         trial = tracking(is_trial,:);
@@ -104,7 +107,7 @@ for ind=1:height(video_table) % Loop through videos
         sip_dist_pix = calc_dist_to_sipper(trial, sipper);
         sip_dist_mm = sip_dist_pix*scale_factor(poi);
 
-        figure(2); clf; hold on;
+        f2 = figure(2); clf; hold on;
         % light rectangle and text
         for i=1:length(light_start)
             width = light_stop(i) - light_start(i);
@@ -134,13 +137,14 @@ for ind=1:height(video_table) % Loop through videos
         ax.YAxis(2).FontWeight= 'bold';
         ax.XAxis.FontWeight= 'bold';
         title(sprintf("Video: %d \nTrial: %d", ind, ind_t))
-        xline(t_time(interest_ind), '--')
+        % xline(t_time(interest_ind), '--')
         set(gca, 'Layer','top')
         %pause(1);
+        saveas(f2, sprintf('%s/trial_%02d.png',fig_dir, ind_t))
 
         % play video
-        figure(3); clf; hold on;
-        play_video(video_path, trial.time_video(1), trial.time_video(end))
+        % figure(3); clf; hold on;
+        % play_video(video_path, trial.time_video(1), trial.time_video(end))
 
         % Save interpolated gaze and distance
         all_gaze(ind, ind_t, :) = interp1(t_time, gaze_diff, common_time, 'linear','extrap');
