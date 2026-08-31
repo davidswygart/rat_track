@@ -3,6 +3,7 @@ import ast
 import json
 import os
 import subprocess
+import tempfile
 import cv2
 import numpy as np
 import sys
@@ -72,10 +73,14 @@ def main(job_folder: str | Path, skip_existing: bool = True) -> None:
         else:
             print(f"error choosing points for {r.video_path}")
 
-    # Create cropping process for each video
-    vi_temp['process'] = None  
+    # Create each crop in a temporary directory on the same filesystem as the
+    # final output. This keeps incomplete files out of their final locations and
+    # allows a successful crop to be installed atomically with os.replace().
+    vi_temp['process'] = None
+    vi_temp['temp_cropped_path'] = None
+    temp_directory = tempfile.TemporaryDirectory(prefix='.crop_video-', dir=export_dir)
     for r in vi_temp.itertuples():
-        if r.points is None:
+        if r.points is None or r.crop_success:
             continue
 
         # cropping and padding strings
@@ -99,7 +104,9 @@ def main(job_folder: str | Path, skip_existing: bool = True) -> None:
 
         if hasattr(r, 'flip_xy') and r.flip_xy:
             filter_chain = filter_chain + ",hflip,vflip"
-        
+
+        temp_cropped_path = os.path.join(temp_directory.name, f'{r.id}.mp4')
+
         # Full FFmpeg command
         ffmpeg_cmd = [
             "ffmpeg",
@@ -108,13 +115,12 @@ def main(job_folder: str | Path, skip_existing: bool = True) -> None:
             "-vf", filter_chain,
             "-c:a", "copy",
             "-an",
-            r.cropped_path
+            temp_cropped_path,
         ]
 
-        p = subprocess.Popen(ffmpeg_cmd, stderr=subprocess.PIPE, text=True)
-        vi_temp.at[r.Index, 'process'] = p
-
-
+        process = subprocess.Popen(ffmpeg_cmd, stderr=subprocess.PIPE, text=True)
+        vi_temp.at[r.Index, 'process'] = process
+        vi_temp.at[r.Index, 'temp_cropped_path'] = temp_cropped_path
 
     print("All subprocesses launched.")
 
@@ -124,10 +130,17 @@ def main(job_folder: str | Path, skip_existing: bool = True) -> None:
             stderr_output: str
             _, stderr_output = r.process.communicate() # wait for process
             if r.process.returncode == 0:
-                print(f"crop success for {r.id}")
-                vi_temp.at[r.Index, 'crop_success'] = True       
+                try:
+                    os.replace(r.temp_cropped_path, r.cropped_path)
+                except OSError as error:
+                    print(f"error saving cropped video for {r.id}: {error}")
+                else:
+                    print(f"crop success for {r.id}")
+                    vi_temp.at[r.Index, 'crop_success'] = True
             else:
                 print(f"ffmpeg Error for {r.id}:\n{stderr_output.strip()}")
+
+    temp_directory.cleanup()
 
     print("All subprocesses completed.")
 
