@@ -8,8 +8,8 @@ def run_dlc(
     video_folder: str | Path,
     project_root: str | Path | None = None,
     create_video: bool = True,
-    network_path: str | Path = "/research/lapishla/dlc/networks/2CAP-Pi",
-    shuffle: int = 3,
+    network_path: str | Path = "/research/lapishla/dlc/networks/2CAPandFiber-Pi-2026-08-19",
+    shuffle: int = 2,
 ) -> None:
 
     # Parse arguments

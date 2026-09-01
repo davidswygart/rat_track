@@ -4,20 +4,31 @@ post_time = 18;
 speedup = 1.5;
 
 job_folder = pwd;
-video_table = load_video_csv(job_folder);
-name = input( "Please enter your name:", 's');
+csv_path = [job_folder filesep 'videosTestDays.csv'];
+video_table = readtable(csv_path, 'Delimiter', ',');
+name = string(input( "Please enter your name:", 's'));
 welcome_message(name)
 for ind_v=1:height(video_table)
     try
-    id = video_table.id{ind_v};
-    csEvents = extract_2CAP_trials(video_table.pi_folder{ind_v});
-    video_path=[job_folder filesep 'videos' filesep id '.mp4'];
-    vidObj = VideoReader(video_path);
-
-    [curation, curation_file] = load_curation(job_folder,id);
-    if isempty(curation)
-        curation = table(nan(size(csEvents)), strings(size(csEvents)), 'VariableNames', {'seeking', 'seekCurator'});
+        id = video_table.id{ind_v};
+        csEvents = extract_2CAP_trials(video_table.pi_folder{ind_v});
+        video_path=[job_folder filesep 'videos' filesep id '.mp4'];
+        vidObj = VideoReader(video_path);
+        [curation, curation_file] = load_curation(job_folder,id);
+        %curation.seekCurator = string(curation.seekCurator); % THIS IS THE LINE TO COMMENT IN AND OUT AS NEEDED
+        disp('hi')
+    catch
+        warning("problem loading video #%i: skipping", ind_v)
+        continue
     end
+    if isempty(curation)
+        num_array = nan(size(csEvents));
+        str_array = strings(size(csEvents));
+        var_names = {'drinking','correctSide','seeking', 'seekCurator'};
+        var_arrays = {num_array, num_array, num_array, str_array};
+        curation = table(var_arrays{:}, VariableNames=var_names);
+    end
+
 
     ind_t = 0;
     skip_nan=true; 
@@ -34,10 +45,10 @@ for ind_v=1:height(video_table)
         while true
             fig = figure(1); clf;
             title(sprintf('id %s ; trial %i', strrep(id, '_', '\_'),ind_t))
-            xlabel({'input your label', 's=speed up ; a=ahhh! too fast'})
+            xlabel({'input your label', 'f=faster ; a=ahhh! too fast; d = drank; s = seeking; c = correct side initially; h = help for this trial; l = rat is lazy did nothing; n = next trial'})
             keypress = play_video(vidObj, start_video, stop_video, speedup);
             switch keypress
-                case 's'
+                case 'f'
                     speedup = speedup*1.5;
                     fprintf("new speed = %f\n", speedup)
                 case 'a'
@@ -53,21 +64,51 @@ for ind_v=1:height(video_table)
                        disp("Can't go back, already on first trial")
                     end
                 case 'n'
-                    disp("skipping to next trial")
+                    curation.seekCurator(ind_t)=name;
+                    if isnan(curation.drinking(ind_t))
+                        curation.drinking(ind_t) = 0;
+                    end
+                    if isnan(curation.seeking(ind_t))
+                        curation.seeking(ind_t) = 0;
+                    end
+                    if isnan(curation.correctSide(ind_t))
+                        curation.correctSide(ind_t) = 0;
+                    end
+                    disp("going to next trial")
+                    break;
+                case 'd'
+                    curation.drinking(ind_t) = 1;
+                    disp("they drank")
+                case 's'
+                    curation.seeking(ind_t) = 1;
+                    disp("there was seeking")
+                case 'c'
+                    curation.correctSide(ind_t) = 1;
+                    disp("they were on the correct side initially")
+                case 'l'
+                    curation.drinking(ind_t) = 0;
+                    curation.seeking(ind_t) = 0;
+                    curation.correctSide(ind_t) = 0;
+                    curation.seekCurator(ind_t)=name;
+                    disp("lazy and sleepy time")
+                    break;
+                case 'h'
+                    curation.drinking(ind_t) = 2;
+                    curation.seeking(ind_t) = 2;
+                    curation.correctSide(ind_t) = 2;
+                    curation.seekCurator(ind_t)=name;
+                    disp("help for that trial is on the way, sometime in the future")
                     break;
                 otherwise
                     if ~isempty(keypress)
-                        curation.seeking{ind_t} = keypress;
-                        curation.seekCurator{ind_t}=name;
+                        curation.seeking(ind_t) = keypress;
+                        curation.seekCurator(ind_t)=name;
                         fprintf('Labeled: %s \n', keypress)
                         break
-                    end   
+                    end
             end
         end
         writetable(curation, curation_file);
-    end
-    catch
-        warning("problem with %s: skipping", video_table.id{ind_v})
     end
 end
 disp("YOU ARE DONE!!!!")

@@ -1,4 +1,4 @@
-#!/home/lapishla/miniconda3/envs/DEEPLABCUT/bin/python3
+#!/usr/bin/python3
 import sys
 import multiprocessing
 from deeplabcut.utils.auxiliaryfunctions import read_config
@@ -8,7 +8,7 @@ from functools import partial
 skip_previously_extracted = True
 
 def main(job_folder):
-    config_path = "/home/lapishla/Desktop/dlc_networks/2CAP-Pi/config.yaml" 
+    config_path = "/home/lapishla/Desktop/dlc/networks/2CAP-PiFiber/config.yaml" 
     cfg = read_config(config_path)
     videos = [v for v in cfg["video_sets"]]
 

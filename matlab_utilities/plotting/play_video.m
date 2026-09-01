@@ -29,5 +29,9 @@ function keypress = play_video(video, start, stop, speedup)
         if ~isempty(keypress)
             return
         end
+        %attempting to fix video not speeding up issue
+        if speedup > 1
+            vidObj.CurrentTime = vidObj.CurrentTime + (speedup - 1) / vidObj.FrameRate;
+        end
     end
 end
