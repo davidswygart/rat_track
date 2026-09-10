@@ -2,7 +2,7 @@
 from deeplabcut import analyze_videos, filterpredictions, create_labeled_video
 import argparse
 from pathlib import Path
-from typing import Sequence
+from typing import Sequence, Any
 
 def run_dlc(
     video_folder: str | Path,
@@ -93,9 +93,9 @@ def contains_files(folder: str | Path, required: Sequence[str]) -> bool:
     return all(in_folder)
 
 
-def parse_args() -> argparse.Namespace:
+def parse_args() -> dict[str, Any]:
     parser = argparse.ArgumentParser(description="Run DeepLabCut analysis on all .mp4 videos in a folder")
-    parser.add_argument("video_folder", help="Path to folder containing .mp4 videos")
+    parser.add_argument("video_folder", nargs="?", help="Path to folder containing .mp4 videos")
     parser.add_argument("--project_root", dest="project_root", default=None,
                         help="Project root directory (defaults to parent of video_folder)")
     parser.add_argument("--network_path", dest="network_path", default=None,
@@ -108,14 +108,18 @@ def parse_args() -> argparse.Namespace:
     group.add_argument("--no_video", dest="create_video", action="store_false",
                        help="Do not generate labeled videos")
     parser.set_defaults(create_video=None)
-    return parser.parse_args()
+    args = parser.parse_args()
 
+    # Prompt user for video folder if not provided
+    if args.video_folder is None:
+        vid_folder = input("Enter the path to the video folder: ").strip()
+        args.video_folder = str(Path(vid_folder).expanduser()) # replace ~ with home directory
 
-def main() -> None:
-    args = parse_args()
-    kwargs = {k: v for k, v in vars(args).items() if k != 'video_folder' and v is not None}
-    run_dlc(args.video_folder, **kwargs)
+    # Strip out all the None values, so run_dlc can use its defaults for those parameters
+    kwargs = {k: v for k, v in vars(args).items() if v is not None}
+    return kwargs
 
 
 if __name__ == "__main__":
-    main()
+    kwargs = parse_args()
+    run_dlc(**kwargs)
