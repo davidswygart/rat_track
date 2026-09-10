@@ -14,6 +14,14 @@ def run_dlc(
 
     # Parse arguments
     video_folder = Path(video_folder)
+    if not video_folder.exists():
+        raise FileNotFoundError(f"Video folder does not exist: {video_folder}")
+    if not video_folder.is_dir():
+        raise NotADirectoryError(f"Video folder is not a directory: {video_folder}")
+    videos = list(video_folder.glob('*.mp4'))
+    if not videos:
+        raise ValueError(f"No .mp4 videos found in video folder: {video_folder}")
+
     network_path = Path(network_path)
     if project_root is None:
         project_root = video_folder.parent
@@ -26,7 +34,7 @@ def run_dlc(
     config =  network_path / 'config.yaml'
 
     failed_videos = []
-    for v in video_folder.glob('*.mp4'):
+    for v in videos:
         output_folder = output_root / v.stem
         output_folder.mkdir(parents=True, exist_ok=True)
         
